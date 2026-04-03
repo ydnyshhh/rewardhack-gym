@@ -1,4 +1,4 @@
-# RewardHack-Gym
+# rewardhack-gym
 
 This repo came out of a question I had been sitting with for a while: if we want to understand reward hacking seriously, what is the right experimental substrate for it?
 
