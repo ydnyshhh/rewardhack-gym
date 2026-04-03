@@ -6,6 +6,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+from rewardhack_gym import create_environment
+
 
 def run_cli_command(*args: str) -> subprocess.CompletedProcess[str]:
     env = dict(os.environ)
@@ -97,3 +99,38 @@ def test_cli_evaluate_traces_can_write_summary_and_cohorts() -> None:
     assert summary["num_trajectories"] == 1
     assert summary["false_pass_rate"] == 1.0
     assert len(false_pass_lines) == 1
+
+
+def test_cli_can_export_mech_interp_rows_and_build_pairs() -> None:
+    artifact_dir = Path("tests_artifacts")
+    artifact_dir.mkdir(exist_ok=True)
+    input_path = artifact_dir / "mech_interp_cli_inputs.jsonl"
+    traces_path = artifact_dir / "mech_interp_cli_traces.jsonl"
+    export_path = artifact_dir / "mech_interp_cli_rows.jsonl"
+    pairs_path = artifact_dir / "mech_interp_cli_pairs.jsonl"
+
+    env = create_environment("math/reasoning-validity")
+    task = env.sample_task(seed=5)
+    input_path.write_text(
+        json.dumps({"seed": 5, "output": env.canonical_true_output(task)}) + "\n" +
+        json.dumps({"seed": 5, "output": env.canonical_exploit_output(task)}) + "\n",
+        encoding="utf-8",
+    )
+    run_cli_command(
+        "evaluate-traces",
+        "math/reasoning-validity",
+        "--input",
+        str(input_path),
+        "--output",
+        str(traces_path),
+    )
+    run_cli_command("export-mech-interp", "--input", str(traces_path), "--output", str(export_path))
+    run_cli_command("build-matched-pairs", "--input", str(export_path), "--output", str(pairs_path))
+
+    exported_rows = [json.loads(line) for line in export_path.read_text(encoding="utf-8").strip().splitlines()]
+    pair_rows = [json.loads(line) for line in pairs_path.read_text(encoding="utf-8").strip().splitlines()]
+    assert len(exported_rows) == 2
+    assert exported_rows[0]["environment_name"] == "math/reasoning-validity"
+    assert "scenario_cohort_id" in exported_rows[0]
+    assert len(pair_rows) == 1
+    assert pair_rows[0]["match_level"] == "exact-task"

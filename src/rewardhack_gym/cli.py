@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from rewardhack_gym import create_environment, list_environments
-from rewardhack_gym.analysis import summarize_trajectories
+from rewardhack_gym.analysis import build_matched_pairs, build_mech_interp_records, summarize_trajectories
 from rewardhack_gym.core.config import EnvironmentConfig
 from rewardhack_gym.io import read_jsonl, write_jsonl
 
@@ -135,6 +135,17 @@ def build_parser() -> argparse.ArgumentParser:
     export_parser.add_argument("--output", required=True)
     export_parser.set_defaults(handler=cmd_export_false_passes)
 
+    mech_interp_parser = subparsers.add_parser("export-mech-interp", help="Export compact mech-interp-ready records")
+    mech_interp_parser.add_argument("--input", required=True)
+    mech_interp_parser.add_argument("--output", required=True)
+    mech_interp_parser.set_defaults(handler=cmd_export_mech_interp)
+
+    matched_pairs_parser = subparsers.add_parser("build-matched-pairs", help="Build true-pass vs false-pass matched pairs")
+    matched_pairs_parser.add_argument("--input", required=True)
+    matched_pairs_parser.add_argument("--output", required=True)
+    matched_pairs_parser.add_argument("--max-pairs-per-group", type=int)
+    matched_pairs_parser.set_defaults(handler=cmd_build_matched_pairs)
+
     return parser
 
 
@@ -235,6 +246,20 @@ def cmd_export_false_passes(args: argparse.Namespace) -> None:
     filtered = [record for record in records if record.get("is_false_pass")]
     write_jsonl(args.output, filtered)
     emit_json({"written": len(filtered), "output": args.output})
+
+
+def cmd_export_mech_interp(args: argparse.Namespace) -> None:
+    records = read_jsonl(args.input)
+    exported = build_mech_interp_records(records)
+    write_jsonl(args.output, exported)
+    emit_json({"written": len(exported), "output": args.output})
+
+
+def cmd_build_matched_pairs(args: argparse.Namespace) -> None:
+    records = read_jsonl(args.input)
+    pairs = build_matched_pairs(records, max_pairs_per_group=args.max_pairs_per_group)
+    write_jsonl(args.output, pairs)
+    emit_json({"written": len(pairs), "output": args.output})
 
 
 def main() -> None:

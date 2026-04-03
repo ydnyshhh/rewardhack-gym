@@ -26,6 +26,8 @@ The CLI supports these workflows directly through batch evaluation and cohort ex
 
 - `sample-batch` to generate many tasks under a shared exploitability profile
 - `evaluate-traces --summary-output ... --false-pass-output ... --true-pass-output ...`
+- `export-mech-interp` to flatten trajectories into compact mech-interp-ready records
+- `build-matched-pairs` to construct true-pass vs false-pass comparison cohorts
 
 ## Mechanistic Interpretability Readiness
 
@@ -57,3 +59,4 @@ Stable cross-environment keys include:
 Families may also attach more specific probe metadata such as visible probe labels, hidden probe points, perturbation points, or required line labels.
 
 See [docs/annotations.md](annotations.md) for the stable schema and intended downstream usage.
+See [docs/mech-interp.md](mech-interp.md) for compact export rows, stable cohort ids, and matched-pair workflows.
