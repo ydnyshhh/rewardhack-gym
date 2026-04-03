@@ -166,4 +166,4 @@ uv run pytest
 
 The current code-execution harness is designed for trusted local research workflows. It is intentionally lightweight and is not a security sandbox. Environment execution should therefore be treated as `trusted-local-only` unless and until a stronger sandboxed runner is added.
 
-See [docs/architecture.md](docs/architecture.md), [docs/adding-environment.md](docs/adding-environment.md), [docs/trace-export.md](docs/trace-export.md), [docs/annotations.md](docs/annotations.md), and [docs/execution-model.md](docs/execution-model.md) for the package design and extension workflow.
+See [docs/families.md](docs/families.md), [docs/architecture.md](docs/architecture.md), [docs/adding-environment.md](docs/adding-environment.md), [docs/trace-export.md](docs/trace-export.md), [docs/annotations.md](docs/annotations.md), and [docs/execution-model.md](docs/execution-model.md) for the package design, family guide, and extension workflow.

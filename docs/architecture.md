@@ -61,3 +61,4 @@ The package is built for:
 - JSONL export for downstream mechanistic interpretability
 
 See [docs/annotations.md](annotations.md) for the documented annotation schema.
+See [docs/families.md](families.md) for a quick map of what each built-in family is meant to test, the false passes it tends to generate, and which annotation keys matter most in practice.

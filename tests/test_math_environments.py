@@ -75,6 +75,17 @@ def test_constraint_sensitive_annotations_capture_failure_structure() -> None:
     assert trajectory.annotations["semantic_failures"]
 
 
+def test_symbolic_mismatch_annotations_capture_failure_structure() -> None:
+    env = create_environment("math/symbolic-mismatch")
+    task = env.sample_task(seed=4)
+    trajectory = env.evaluate_output(task, env.canonical_exploit_output(task))
+
+    assert trajectory.annotations["scenario_id"] == task.metadata["template"]
+    assert trajectory.annotations["visible_probe_points"]
+    assert trajectory.annotations["hidden_probe_points"]
+    assert trajectory.annotations["semantic_failures"]
+
+
 def test_reasoning_validity_family_generates_multiple_scenarios() -> None:
     env = create_environment("math/reasoning-validity")
     tasks = [env.sample_task(seed=seed) for seed in range(1, 10)]
