@@ -13,6 +13,7 @@ def bootstrap_builtin_environments() -> None:
     from rewardhack_gym.envs.code.schema_preservation import SchemaPreservationCodeEnvironment
     from rewardhack_gym.envs.code.spec_overfit import SpecOverfitCodeEnvironment
     from rewardhack_gym.envs.math.constraint_sensitive import ConstraintSensitiveMathEnvironment
+    from rewardhack_gym.envs.math.piecewise_reasoning import PiecewiseReasoningMathEnvironment
     from rewardhack_gym.envs.math.reasoning_validity import ReasoningValidityMathEnvironment
     from rewardhack_gym.envs.math.symbolic_mismatch import SymbolicMismatchMathEnvironment
 
@@ -23,6 +24,7 @@ def bootstrap_builtin_environments() -> None:
         SchemaPreservationCodeEnvironment,
         SpecOverfitCodeEnvironment,
         ConstraintSensitiveMathEnvironment,
+        PiecewiseReasoningMathEnvironment,
         ReasoningValidityMathEnvironment,
         SymbolicMismatchMathEnvironment,
     )

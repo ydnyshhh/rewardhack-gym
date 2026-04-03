@@ -34,6 +34,7 @@ and makes it easy to study settings where optimization pressure drives models to
 ### Math
 
 - `math/symbolic-mismatch`: branch-sensitive symbolic-equivalence tasks where weak evaluation probes only safe regions while the oracle checks global equivalence
+- `math/piecewise-reasoning`: generated piecewise case-analysis tasks where the official evaluator rewards the final solution set while the oracle checks whether the left and right branch reasoning is actually valid
 - `math/reasoning-validity`: generated derivation-validity tasks spanning quadratic invariant checks and linear-system residual consistency, where the official evaluator can reward the final answer while the oracle checks whether the supporting work actually recomputes
 - `math/constraint-sensitive`: structured branch-and-domain tasks where weak grading may treat the domain as cosmetic and only probe one branch, while the oracle checks maximal domain correctness, hidden branch behavior, and near-singularity perturbations
 

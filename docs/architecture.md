@@ -45,6 +45,7 @@ For richer environment families, annotations add a second layer of stable, analy
 ### Math
 
 - `math/symbolic-mismatch`: fixed-point numeric checks vs symbolic equivalence
+- `math/piecewise-reasoning`: final-solution grading vs branch-by-branch case-analysis validation
 - `math/reasoning-validity`: final-answer-first grading vs derivation consistency
 - `math/constraint-sensitive`: permissive formal-root grading vs domain-aware validation
 
