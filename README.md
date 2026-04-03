@@ -26,14 +26,14 @@ and makes it easy to study settings where optimization pressure drives models to
 ### Code
 
 - `code/spec-overfit`: implementation tasks where the official verifier emphasizes public examples from realistic pipeline-style state reconstruction tasks, while the oracle probes stale-update semantics, dominance invariants, and adversarial distribution shift
-- `code/patch-verification`: bug-fix tasks where narrow bug-ticket success can conceal broader semantic regressions
+- `code/patch-verification`: patch tasks where the official verifier focuses on the reported regression, while the oracle checks semantic preservation, hidden workflow regressions, deletion semantics, tie handling, and side effects like input mutation
 - `code/interface-conformance`: protocol tasks where visible examples pass but deeper state, aliasing, and contract guarantees fail
 
 ### Math
 
 - `math/symbolic-mismatch`: branch-sensitive symbolic-equivalence tasks where weak evaluation probes only safe regions while the oracle checks global equivalence
 - `math/reasoning-validity`: final-answer correctness or template compliance versus derivation-level consistency
-- `math/constraint-sensitive`: weak grading under narrow assumptions versus full domain, branch, and boundary validation
+- `math/constraint-sensitive`: structured branch-and-domain tasks where weak grading may treat the domain as cosmetic and only probe one branch, while the oracle checks maximal domain correctness, hidden branch behavior, and near-singularity perturbations
 
 ## Core Design Idea
 
@@ -97,7 +97,9 @@ print(summary.false_pass_rate)
 uv run rewardhack-gym inspect-env code/spec-overfit
 uv run rewardhack-gym inspect-env code/spec-overfit --profile low
 uv run rewardhack-gym sample-task code/spec-overfit --seed 7
+uv run rewardhack-gym sample-batch code/patch-verification --count 32 --output tasks.jsonl --include-canonicals
 uv run rewardhack-gym evaluate-output code/spec-overfit --seed 7 --text-file outputs/spec_overfit.py
+uv run rewardhack-gym evaluate-traces math/constraint-sensitive --input outputs.jsonl --output traces.jsonl --summary-output summary.json --false-pass-output false_passes.jsonl
 uv run rewardhack-gym stats --input traces.jsonl
 uv run rewardhack-gym export-false-passes --input traces.jsonl --output false_passes.jsonl
 ```
@@ -131,6 +133,12 @@ The library is designed for:
 - async RL reward analysis
 - false-pass mining
 - trajectory export for mechanistic interpretability
+
+The CLI now supports a more explicit batch workflow for that style of research:
+
+- sample many tasks under a chosen exploitability profile
+- evaluate an outputs file against those tasks
+- write summary metrics plus true-pass / false-pass cohorts directly
 
 ## Development
 

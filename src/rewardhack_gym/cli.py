@@ -24,6 +24,28 @@ def emit_json(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, indent=2, sort_keys=True))
 
 
+def write_json(path: str | Path, payload: dict[str, Any]) -> None:
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def filter_records_by_mode(records: list[dict[str, Any]], mode: str) -> list[dict[str, Any]]:
+    if mode == "false-pass":
+        return [record for record in records if record.get("is_false_pass")]
+    if mode == "true-pass":
+        return [
+            record
+            for record in records
+            if record.get("official_result", {}).get("passed") and record.get("oracle_result", {}).get("passed")
+        ]
+    if mode == "official-pass":
+        return [record for record in records if record.get("official_result", {}).get("passed")]
+    if mode == "oracle-pass":
+        return [record for record in records if record.get("oracle_result", {}).get("passed")]
+    raise ValueError(f"Unknown cohort mode: {mode}")
+
+
 def add_environment_config_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--profile", choices=("low", "medium", "high", "adversarial"), default="medium")
     parser.add_argument("--official-coverage", type=float)
@@ -70,6 +92,16 @@ def build_parser() -> argparse.ArgumentParser:
     add_environment_config_arguments(sample_parser)
     sample_parser.set_defaults(handler=cmd_sample_task)
 
+    sample_batch_parser = subparsers.add_parser("sample-batch", help="Sample many tasks and write them to JSONL")
+    sample_batch_parser.add_argument("environment")
+    sample_batch_parser.add_argument("--seed", type=int, default=0)
+    sample_batch_parser.add_argument("--count", type=int, required=True)
+    sample_batch_parser.add_argument("--output", required=True)
+    sample_batch_parser.add_argument("--include-hidden", action="store_true")
+    sample_batch_parser.add_argument("--include-canonicals", action="store_true")
+    add_environment_config_arguments(sample_batch_parser)
+    sample_batch_parser.set_defaults(handler=cmd_sample_batch)
+
     eval_parser = subparsers.add_parser("evaluate-output", help="Evaluate a single output against an environment")
     eval_parser.add_argument("environment")
     eval_parser.add_argument("--seed", type=int, default=0)
@@ -86,6 +118,11 @@ def build_parser() -> argparse.ArgumentParser:
     traces_parser.add_argument("--seed", type=int, default=0)
     traces_parser.add_argument("--input", required=True)
     traces_parser.add_argument("--output", required=True)
+    traces_parser.add_argument("--summary-output")
+    traces_parser.add_argument("--false-pass-output")
+    traces_parser.add_argument("--true-pass-output")
+    traces_parser.add_argument("--official-pass-output")
+    traces_parser.add_argument("--oracle-pass-output")
     add_environment_config_arguments(traces_parser)
     traces_parser.set_defaults(handler=cmd_evaluate_traces)
 
@@ -128,6 +165,29 @@ def cmd_sample_task(args: argparse.Namespace) -> None:
     emit_json(task.to_dict(include_hidden=args.include_hidden))
 
 
+def cmd_sample_batch(args: argparse.Namespace) -> None:
+    if args.count <= 0:
+        raise SystemExit("--count must be positive.")
+    config = build_environment_config(args)
+    env = create_environment(args.environment, config)
+    records = []
+    for offset in range(args.count):
+        seed = args.seed + offset
+        task = env.sample_task(seed=seed)
+        record: dict[str, Any] = {
+            "environment": args.environment,
+            "seed": seed,
+            "profile": config.exploitability.level,
+            "task": task.to_dict(include_hidden=args.include_hidden),
+        }
+        if args.include_canonicals:
+            record["canonical_true_output"] = env.canonical_true_output(task)
+            record["canonical_exploit_output"] = env.canonical_exploit_output(task)
+        records.append(record)
+    write_jsonl(args.output, records)
+    emit_json({"written": len(records), "output": args.output, "environment": args.environment})
+
+
 def cmd_evaluate_output(args: argparse.Namespace) -> None:
     env = create_environment(args.environment, build_environment_config(args))
     task = env.sample_task(seed=args.seed)
@@ -153,6 +213,16 @@ def cmd_evaluate_traces(args: argparse.Namespace) -> None:
         trajectory = env.evaluate_output(task, output, policy_id=record.get("policy_id"))
         output_records.append(trajectory.to_dict())
     write_jsonl(args.output, output_records)
+    if args.summary_output:
+        write_json(args.summary_output, summarize_trajectories(output_records).to_dict())
+    if args.false_pass_output:
+        write_jsonl(args.false_pass_output, filter_records_by_mode(output_records, "false-pass"))
+    if args.true_pass_output:
+        write_jsonl(args.true_pass_output, filter_records_by_mode(output_records, "true-pass"))
+    if args.official_pass_output:
+        write_jsonl(args.official_pass_output, filter_records_by_mode(output_records, "official-pass"))
+    if args.oracle_pass_output:
+        write_jsonl(args.oracle_pass_output, filter_records_by_mode(output_records, "oracle-pass"))
 
 
 def cmd_stats(args: argparse.Namespace) -> None:

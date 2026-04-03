@@ -22,6 +22,11 @@ Typical downstream filters are:
 - `oracle_result.passed == false`
 - exploit labels such as `sample-point-spoof` or `state-aliasing`
 
+The CLI supports these workflows directly through batch evaluation and cohort export:
+
+- `sample-batch` to generate many tasks under a shared exploitability profile
+- `evaluate-traces --summary-output ... --false-pass-output ... --true-pass-output ...`
+
 ## Mechanistic Interpretability Readiness
 
 The package is structured so future interp layers can attach:
@@ -32,4 +37,3 @@ The package is structured so future interp layers can attach:
 - model and policy metadata
 
 Without changing the core environment API, the exported trajectories already provide stable hooks for later cross-linking.
-

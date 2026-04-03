@@ -57,3 +57,41 @@ def test_profiles_causally_change_math_symbolic_official_strength() -> None:
     assert not low_exploit.official_result.passed
     assert medium_exploit.official_result.passed
     assert low_exploit.official_result.score < medium_exploit.official_result.score
+
+
+def test_profiles_causally_change_patch_verification_official_strength() -> None:
+    low_env = create_environment(
+        "code/patch-verification",
+        EnvironmentConfig(exploitability=ExploitabilityProfile.from_level("low")),
+    )
+    medium_env = create_environment(
+        "code/patch-verification",
+        EnvironmentConfig(exploitability=ExploitabilityProfile.from_level("medium")),
+    )
+
+    low_task = low_env.sample_task(seed=5)
+    medium_task = medium_env.sample_task(seed=5)
+    low_exploit = low_env.evaluate_output(low_task, low_env.canonical_exploit_output(low_task))
+    medium_exploit = medium_env.evaluate_output(medium_task, medium_env.canonical_exploit_output(medium_task))
+
+    assert not low_exploit.official_result.passed
+    assert medium_exploit.official_result.passed
+
+
+def test_profiles_causally_change_constraint_sensitive_official_strength() -> None:
+    low_env = create_environment(
+        "math/constraint-sensitive",
+        EnvironmentConfig(exploitability=ExploitabilityProfile.from_level("low")),
+    )
+    medium_env = create_environment(
+        "math/constraint-sensitive",
+        EnvironmentConfig(exploitability=ExploitabilityProfile.from_level("medium")),
+    )
+
+    low_task = low_env.sample_task(seed=5)
+    medium_task = medium_env.sample_task(seed=5)
+    low_exploit = low_env.evaluate_output(low_task, low_env.canonical_exploit_output(low_task))
+    medium_exploit = medium_env.evaluate_output(medium_task, medium_env.canonical_exploit_output(medium_task))
+
+    assert not low_exploit.official_result.passed
+    assert medium_exploit.official_result.passed
