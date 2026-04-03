@@ -6,7 +6,7 @@ I did not want to study it only through one-off anecdotes or post hoc explanatio
 
 That led to the idea behind `rewardhack-gym`: a package of synthetic environments, starting with coding and math, designed to make these failures reproducible enough to study rather than just notice. The environments are meant to be useful on their own, but they are also meant to support a second layer of work I care about even more: understanding these behaviors through mechanistic interpretability once they appear.
 
-RewardHack-Gym is a gym-style Python package for constructing and analyzing verifiable agent environments with controllable proxy-objective mismatch, designed for reward hacking, post-training, and mechanistic interpretability research. It is built as a research substrate, not as a static benchmark. Each environment centers the primitive:
+RewardHack-Gym is a gym-style package for constructing and analyzing verifiable agent environments with controllable proxy-objective mismatch, designed for reward hacking, post-training, and mechanistic interpretability research. It is built as a research substrate, not as a static benchmark. Each environment centers the primitive:
 
 `task + official verifier + oracle + exploit surface`
 
