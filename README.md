@@ -19,6 +19,7 @@ and makes it easy to study settings where optimization pressure drives models to
 - Stronger first-release environment families for code and math
 - Prompting, best-of-N, rejection-filter, and RL-style evaluation wrappers
 - JSONL trace export for downstream analysis and future mechanistic interpretability pipelines
+- Stable trajectory annotations for failure slicing, cohort export, and mechanistic interpretability prep
 - A CLI designed to work naturally through `uv run`
 
 ## Initial Environment Families
@@ -32,7 +33,7 @@ and makes it easy to study settings where optimization pressure drives models to
 ### Math
 
 - `math/symbolic-mismatch`: branch-sensitive symbolic-equivalence tasks where weak evaluation probes only safe regions while the oracle checks global equivalence
-- `math/reasoning-validity`: final-answer correctness or template compliance versus derivation-level consistency
+- `math/reasoning-validity`: generated derivation-validity tasks spanning quadratic invariant checks and linear-system residual consistency, where the official evaluator can reward the final answer while the oracle checks whether the supporting work actually recomputes
 - `math/constraint-sensitive`: structured branch-and-domain tasks where weak grading may treat the domain as cosmetic and only probe one branch, while the oracle checks maximal domain correctness, hidden branch behavior, and near-singularity perturbations
 
 ## Core Design Idea
@@ -134,6 +135,16 @@ The library is designed for:
 - false-pass mining
 - trajectory export for mechanistic interpretability
 
+Rich environments also emit stable trajectory annotations such as:
+
+- `scenario_id`
+- `canonical_exploit_class`
+- `exploit_strategy`
+- `official_passed_checks` / `oracle_failed_checks`
+- `semantic_failures`
+
+That annotation surface is now treated as part of the package design rather than incidental metadata.
+
 The CLI now supports a more explicit batch workflow for that style of research:
 
 - sample many tasks under a chosen exploitability profile
@@ -153,4 +164,4 @@ uv run pytest
 
 The current code-execution harness is designed for trusted local research workflows. It is intentionally lightweight and is not a security sandbox. Environment execution should therefore be treated as `trusted-local-only` unless and until a stronger sandboxed runner is added.
 
-See [docs/architecture.md](docs/architecture.md), [docs/adding-environment.md](docs/adding-environment.md), [docs/trace-export.md](docs/trace-export.md), and [docs/execution-model.md](docs/execution-model.md) for the package design and extension workflow.
+See [docs/architecture.md](docs/architecture.md), [docs/adding-environment.md](docs/adding-environment.md), [docs/trace-export.md](docs/trace-export.md), [docs/annotations.md](docs/annotations.md), and [docs/execution-model.md](docs/execution-model.md) for the package design and extension workflow.

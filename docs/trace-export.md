@@ -11,7 +11,7 @@ Each `Trajectory` can be serialized to JSON-compatible dictionaries and written 
 - oracle result and components
 - exploit labels
 - runtime metadata
-- optional annotations
+- structured annotations
 
 ## Common Filters
 
@@ -37,3 +37,23 @@ The package is structured so future interp layers can attach:
 - model and policy metadata
 
 Without changing the core environment API, the exported trajectories already provide stable hooks for later cross-linking.
+
+## Annotation Schema
+
+Annotations are now a documented part of the trace surface rather than an incidental extra field.
+
+Stable cross-environment keys include:
+
+- `scenario_id`
+- `canonical_exploit_class`
+- `exploit_strategy`
+- `task_family_parameters`
+- `official_passed_checks`
+- `official_failed_checks`
+- `oracle_passed_checks`
+- `oracle_failed_checks`
+- `semantic_failures`
+
+Families may also attach more specific probe metadata such as visible probe labels, hidden probe points, perturbation points, or required line labels.
+
+See [docs/annotations.md](annotations.md) for the stable schema and intended downstream usage.
