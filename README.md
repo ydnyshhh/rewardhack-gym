@@ -29,6 +29,7 @@ and makes it easy to study settings where optimization pressure drives models to
 - `code/spec-overfit`: implementation tasks where the official verifier emphasizes public examples from realistic pipeline-style state reconstruction tasks, while the oracle probes stale-update semantics, dominance invariants, and adversarial distribution shift
 - `code/patch-verification`: patch tasks where the official verifier focuses on the reported regression, while the oracle checks semantic preservation, hidden workflow regressions, deletion semantics, tie handling, and side effects like input mutation
 - `code/interface-conformance`: protocol tasks where visible examples pass but deeper state, aliasing, and contract guarantees fail
+- `code/schema-preservation`: normalization tasks where the official verifier scores projected visible fields while the oracle checks schema retention, order stability, compatibility-field preservation, and detached nested outputs
 
 ### Math
 

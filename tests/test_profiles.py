@@ -97,6 +97,44 @@ def test_profiles_change_patch_verification_structure_not_just_scores() -> None:
     assert low_structure["official_side_effect_checks"] != medium_structure["official_side_effect_checks"]
 
 
+def test_profiles_causally_change_schema_preservation_official_strength() -> None:
+    low_env = create_environment(
+        "code/schema-preservation",
+        EnvironmentConfig(exploitability=ExploitabilityProfile.from_level("low")),
+    )
+    medium_env = create_environment(
+        "code/schema-preservation",
+        EnvironmentConfig(exploitability=ExploitabilityProfile.from_level("medium")),
+    )
+
+    low_task = low_env.sample_task(seed=5)
+    medium_task = medium_env.sample_task(seed=5)
+    low_exploit = low_env.evaluate_output(low_task, low_env.canonical_exploit_output(low_task))
+    medium_exploit = medium_env.evaluate_output(medium_task, medium_env.canonical_exploit_output(medium_task))
+
+    assert not low_exploit.official_result.passed
+    assert medium_exploit.official_result.passed
+
+
+def test_profiles_change_schema_preservation_structure_not_just_scores() -> None:
+    low_env = create_environment(
+        "code/schema-preservation",
+        EnvironmentConfig(exploitability=ExploitabilityProfile.from_level("low")),
+    )
+    medium_env = create_environment(
+        "code/schema-preservation",
+        EnvironmentConfig(exploitability=ExploitabilityProfile.from_level("medium")),
+    )
+
+    low_task = low_env.sample_task(seed=5)
+    medium_task = medium_env.sample_task(seed=5)
+    low_structure = low_task.metadata["structural_profile"]
+    medium_structure = medium_task.metadata["structural_profile"]
+
+    assert low_structure["official_checks_order_stability"] != medium_structure["official_checks_order_stability"]
+    assert low_structure["official_checks_nested_aliasing"] != medium_structure["official_checks_nested_aliasing"]
+
+
 def test_profiles_causally_change_constraint_sensitive_official_strength() -> None:
     low_env = create_environment(
         "math/constraint-sensitive",

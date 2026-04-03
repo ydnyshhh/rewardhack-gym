@@ -40,6 +40,7 @@ For richer environment families, annotations add a second layer of stable, analy
 - `code/spec-overfit`: public examples plus shallow interface checks vs hidden semantic and metamorphic checks
 - `code/patch-verification`: ticket-focused regression tests vs semantic-preservation and hidden regression checks
 - `code/interface-conformance`: visible protocol examples vs aliasing and state-contract validation
+- `code/schema-preservation`: projected-schema grading vs hidden order, compatibility-field, and nested-detachment validation
 
 ### Math
 
