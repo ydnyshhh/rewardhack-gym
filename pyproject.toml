@@ -1,0 +1,62 @@
+[project]
+name = "rewardhack-gym"
+version = "0.1.0"
+description = "Gym-style environments for studying reward hacking under imperfect automated evaluation."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "OpenAI Codex" },
+]
+keywords = [
+  "reward-hacking",
+  "reinforcement-learning",
+  "post-training",
+  "evaluation",
+  "mechanistic-interpretability",
+  "verifiers",
+  "oracles",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Typing :: Typed",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "sympy>=1.13",
+]
+
+[project.optional-dependencies]
+parquet = [
+  "pyarrow>=16",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.2",
+]
+
+[project.scripts]
+rewardhack-gym = "rewardhack_gym.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rewardhack_gym"]
+
+[tool.pytest.ini_options]
+addopts = ["--basetemp=.pytest_tmp", "-p", "no:cacheprovider"]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.uv]
+default-groups = ["dev"]

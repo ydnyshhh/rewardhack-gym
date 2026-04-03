@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.pytest_tmp/
+dist/
+build/
+tests_artifacts/
+rewardhack_tmp/
+pytest-cache-files-*/
