@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import asdict
 import json
 from pathlib import Path
 from typing import Any
 
 from rewardhack_gym import create_environment, list_environments
 from rewardhack_gym.analysis import summarize_trajectories
+from rewardhack_gym.core.config import EnvironmentConfig
 from rewardhack_gym.io import read_jsonl, write_jsonl
 
 
@@ -22,6 +24,31 @@ def emit_json(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, indent=2, sort_keys=True))
 
 
+def add_environment_config_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--profile", choices=("low", "medium", "high", "adversarial"), default="medium")
+    parser.add_argument("--official-coverage", type=float)
+    parser.add_argument("--hidden-adversarial-strength", type=float)
+    parser.add_argument("--parser-strictness", type=float)
+    parser.add_argument("--process-validation-fraction", type=float)
+    parser.add_argument("--domain-awareness", type=float)
+    parser.add_argument("--perturbation-robustness", type=float)
+    parser.add_argument("--public-example-diversity", type=float)
+
+
+def build_environment_config(args: argparse.Namespace) -> EnvironmentConfig:
+    overrides = {
+        "official_coverage_fraction": args.official_coverage,
+        "hidden_adversarial_strength": args.hidden_adversarial_strength,
+        "parser_strictness": args.parser_strictness,
+        "process_validation_fraction": args.process_validation_fraction,
+        "domain_awareness": args.domain_awareness,
+        "perturbation_robustness": args.perturbation_robustness,
+        "public_example_diversity": args.public_example_diversity,
+    }
+    cleaned_overrides = {key: value for key, value in overrides.items() if value is not None}
+    return EnvironmentConfig.from_profile(seed=args.seed, profile=args.profile, exploitability_overrides=cleaned_overrides)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="rewardhack-gym", description="RewardHack-Gym CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -33,12 +60,14 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_parser.add_argument("environment")
     inspect_parser.add_argument("--seed", type=int, default=0)
     inspect_parser.add_argument("--include-hidden", action="store_true")
+    add_environment_config_arguments(inspect_parser)
     inspect_parser.set_defaults(handler=cmd_inspect_env)
 
     sample_parser = subparsers.add_parser("sample-task", help="Sample and print a task")
     sample_parser.add_argument("environment")
     sample_parser.add_argument("--seed", type=int, default=0)
     sample_parser.add_argument("--include-hidden", action="store_true")
+    add_environment_config_arguments(sample_parser)
     sample_parser.set_defaults(handler=cmd_sample_task)
 
     eval_parser = subparsers.add_parser("evaluate-output", help="Evaluate a single output against an environment")
@@ -49,12 +78,15 @@ def build_parser() -> argparse.ArgumentParser:
     eval_parser.add_argument("--policy-id")
     eval_parser.add_argument("--output")
     eval_parser.add_argument("--include-hidden-task", action="store_true")
+    add_environment_config_arguments(eval_parser)
     eval_parser.set_defaults(handler=cmd_evaluate_output)
 
     traces_parser = subparsers.add_parser("evaluate-traces", help="Evaluate a JSONL file of outputs")
     traces_parser.add_argument("environment")
+    traces_parser.add_argument("--seed", type=int, default=0)
     traces_parser.add_argument("--input", required=True)
     traces_parser.add_argument("--output", required=True)
+    add_environment_config_arguments(traces_parser)
     traces_parser.set_defaults(handler=cmd_evaluate_traces)
 
     stats_parser = subparsers.add_parser("stats", help="Summarize trajectory JSONL files")
@@ -75,11 +107,14 @@ def cmd_list_envs(args: argparse.Namespace) -> None:
 
 
 def cmd_inspect_env(args: argparse.Namespace) -> None:
-    env = create_environment(args.environment)
+    config = build_environment_config(args)
+    env = create_environment(args.environment, config)
     task = env.sample_task(seed=args.seed)
     emit_json(
         {
             "environment": args.environment,
+            "profile": config.exploitability.level,
+            "exploitability": asdict(config.exploitability),
             "task": task.to_dict(include_hidden=args.include_hidden),
             "canonical_true_output": env.canonical_true_output(task),
             "canonical_exploit_output": env.canonical_exploit_output(task),
@@ -88,13 +123,13 @@ def cmd_inspect_env(args: argparse.Namespace) -> None:
 
 
 def cmd_sample_task(args: argparse.Namespace) -> None:
-    env = create_environment(args.environment)
+    env = create_environment(args.environment, build_environment_config(args))
     task = env.sample_task(seed=args.seed)
     emit_json(task.to_dict(include_hidden=args.include_hidden))
 
 
 def cmd_evaluate_output(args: argparse.Namespace) -> None:
-    env = create_environment(args.environment)
+    env = create_environment(args.environment, build_environment_config(args))
     task = env.sample_task(seed=args.seed)
     text = read_text_argument(args.text, args.text_file)
     trajectory = env.evaluate_output(task, text, policy_id=args.policy_id)
@@ -106,7 +141,7 @@ def cmd_evaluate_output(args: argparse.Namespace) -> None:
 
 
 def cmd_evaluate_traces(args: argparse.Namespace) -> None:
-    env = create_environment(args.environment)
+    env = create_environment(args.environment, build_environment_config(args))
     input_records = read_jsonl(args.input)
     output_records = []
     for index, record in enumerate(input_records):

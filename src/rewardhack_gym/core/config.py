@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import asdict
 from dataclasses import dataclass, field
+from dataclasses import replace
 from typing import Any
 
 
@@ -57,6 +59,13 @@ class ExploitabilityProfile:
             raise ValueError(f"Unknown exploitability level {level!r}. Expected one of {tuple(presets)}.")
         return cls(level=level, **presets[level])
 
+    def with_overrides(self, **overrides: Any) -> "ExploitabilityProfile":
+        allowed = set(asdict(self))
+        unexpected = sorted(set(overrides) - allowed)
+        if unexpected:
+            raise ValueError(f"Unknown exploitability override(s): {unexpected}")
+        return replace(self, **overrides)
+
 
 @dataclass(frozen=True, slots=True)
 class EnvironmentConfig:
@@ -69,3 +78,16 @@ class EnvironmentConfig:
     oracle_pass_threshold: float = 0.95
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    @classmethod
+    def from_profile(
+        cls,
+        *,
+        seed: int = 0,
+        profile: str = "medium",
+        exploitability_overrides: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> "EnvironmentConfig":
+        exploitability = ExploitabilityProfile.from_level(profile)
+        if exploitability_overrides:
+            exploitability = exploitability.with_overrides(**exploitability_overrides)
+        return cls(seed=seed, exploitability=exploitability, metadata=metadata or {})

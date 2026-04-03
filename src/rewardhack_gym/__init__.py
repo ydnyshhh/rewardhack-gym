@@ -1,8 +1,7 @@
 """RewardHack-Gym public API."""
 
-import rewardhack_gym.envs  # noqa: F401  # Ensure environment registration on import.
-
 from rewardhack_gym.analysis.metrics import MetricSummary, summarize_trajectories
+from rewardhack_gym.bootstrap import bootstrap_builtin_environments
 from rewardhack_gym.core.base import ResearchEnvironment
 from rewardhack_gym.core.config import EnvironmentConfig, ExploitabilityProfile
 from rewardhack_gym.core.models import (
@@ -28,6 +27,7 @@ __all__ = [
     "Task",
     "Trajectory",
     "TrajectoryStep",
+    "bootstrap_builtin_environments",
     "create_environment",
     "list_environments",
     "register_environment",

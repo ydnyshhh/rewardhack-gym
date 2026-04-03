@@ -12,6 +12,8 @@ RewardHack-Gym is organized around one central abstraction:
 - `Trajectory`: a structured record of prompt, final output, official result, oracle result, exploit labels, and runtime metadata
 - `MetricSummary`: aggregate statistics such as pass rates, verifier gap, false-pass rate, and exploit-family counts
 
+Built-in environments are registered through an explicit bootstrap step in `rewardhack_gym.bootstrap`, and the registry calls that bootstrap lazily when environments are listed or created.
+
 ## Official Verifier vs Oracle
 
 The official verifier is designed to be:
@@ -52,4 +54,3 @@ The package is built for:
 - RL reward computation
 - async rollout scoring
 - JSONL export for downstream mechanistic interpretability
-

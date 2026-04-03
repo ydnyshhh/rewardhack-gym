@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
-  { name = "OpenAI Codex" },
+  { name = "Yadnyesh" },
 ]
 keywords = [
   "reward-hacking",

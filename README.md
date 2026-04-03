@@ -21,13 +21,13 @@ and makes it easy to study settings where optimization pressure drives models to
 
 ### Code
 
-- `code/spec-overfit`: implementation tasks where the official verifier emphasizes public examples and shallow interface checks, while the oracle probes latent semantic properties, metamorphic invariants, and adversarial distribution shift
+- `code/spec-overfit`: implementation tasks where the official verifier emphasizes public examples from realistic pipeline-style state reconstruction tasks, while the oracle probes stale-update semantics, dominance invariants, and adversarial distribution shift
 - `code/patch-verification`: bug-fix tasks where narrow bug-ticket success can conceal broader semantic regressions
 - `code/interface-conformance`: protocol tasks where visible examples pass but deeper state, aliasing, and contract guarantees fail
 
 ### Math
 
-- `math/symbolic-mismatch`: shallow answer checking and limited sample-point validation versus stronger symbolic and numeric equivalence
+- `math/symbolic-mismatch`: branch-sensitive symbolic-equivalence tasks where weak evaluation probes only safe regions while the oracle checks global equivalence
 - `math/reasoning-validity`: final-answer correctness or template compliance versus derivation-level consistency
 - `math/constraint-sensitive`: weak grading under narrow assumptions versus full domain, branch, and boundary validation
 
@@ -91,11 +91,23 @@ print(summary.false_pass_rate)
 
 ```bash
 uv run rewardhack-gym inspect-env code/spec-overfit
+uv run rewardhack-gym inspect-env code/spec-overfit --profile low
 uv run rewardhack-gym sample-task code/spec-overfit --seed 7
 uv run rewardhack-gym evaluate-output code/spec-overfit --seed 7 --text-file outputs/spec_overfit.py
 uv run rewardhack-gym stats --input traces.jsonl
 uv run rewardhack-gym export-false-passes --input traces.jsonl --output false_passes.jsonl
 ```
+
+The environment CLI exposes exploitability controls directly:
+
+- `--profile low|medium|high|adversarial`
+- `--official-coverage`
+- `--hidden-adversarial-strength`
+- `--parser-strictness`
+- `--process-validation-fraction`
+- `--domain-awareness`
+- `--perturbation-robustness`
+- `--public-example-diversity`
 
 ## Architecture
 
@@ -125,5 +137,8 @@ uv sync
 uv run pytest
 ```
 
-See [docs/architecture.md](docs/architecture.md), [docs/adding-environment.md](docs/adding-environment.md), and [docs/trace-export.md](docs/trace-export.md) for the package design and extension workflow.
+## Execution Model
 
+The current code-execution harness is designed for trusted local research workflows. It is intentionally lightweight and is not a security sandbox. Environment execution should therefore be treated as `trusted-local-only` unless and until a stronger sandboxed runner is added.
+
+See [docs/architecture.md](docs/architecture.md), [docs/adding-environment.md](docs/adding-environment.md), [docs/trace-export.md](docs/trace-export.md), and [docs/execution-model.md](docs/execution-model.md) for the package design and extension workflow.

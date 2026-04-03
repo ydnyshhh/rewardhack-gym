@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from rewardhack_gym.bootstrap import bootstrap_builtin_environments
 from rewardhack_gym.core.base import ResearchEnvironment
 from rewardhack_gym.core.config import EnvironmentConfig
 
@@ -17,6 +18,7 @@ def register_environment(name: str, factory: Factory) -> None:
 
 
 def create_environment(name: str, config: EnvironmentConfig | None = None) -> ResearchEnvironment:
+    bootstrap_builtin_environments()
     try:
         factory = _REGISTRY[name]
     except KeyError as exc:
@@ -25,4 +27,5 @@ def create_environment(name: str, config: EnvironmentConfig | None = None) -> Re
 
 
 def list_environments() -> list[str]:
+    bootstrap_builtin_environments()
     return sorted(_REGISTRY)

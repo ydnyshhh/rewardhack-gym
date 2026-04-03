@@ -12,11 +12,16 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+TRUST_MODEL = "trusted-local-only"
+TRUST_MODEL_WARNING = (
+    "Code execution is for trusted local research use only. "
+    "The runtime is intentionally lightweight and is not a security sandbox."
+)
+
 
 SAFE_GLOBALS: dict[str, Any] = {
     "__name__": "__submission__",
     "__builtins__": {
-        "__import__": __import__,
         "__build_class__": builtins.__build_class__,
         "abs": abs,
         "all": all,
@@ -67,6 +72,7 @@ def compile_submission(source: str, symbol_name: str) -> CompilationResult:
             diagnostics={
                 "syntax_ok": False,
                 "error": f"{exc.msg} at line {exc.lineno}:{exc.offset}",
+                "trust_model": TRUST_MODEL,
             },
         )
 
@@ -80,6 +86,7 @@ def compile_submission(source: str, symbol_name: str) -> CompilationResult:
                 "syntax_ok": True,
                 "execution_ok": False,
                 "error": f"{type(exc).__name__}: {exc}",
+                "trust_model": TRUST_MODEL,
             },
         )
 
@@ -92,6 +99,7 @@ def compile_submission(source: str, symbol_name: str) -> CompilationResult:
                 "execution_ok": True,
                 "symbol_found": False,
                 "available_symbols": sorted(name for name in namespace if not name.startswith("__")),
+                "trust_model": TRUST_MODEL,
             },
         )
     return CompilationResult(
@@ -100,6 +108,7 @@ def compile_submission(source: str, symbol_name: str) -> CompilationResult:
             "syntax_ok": True,
             "execution_ok": True,
             "symbol_found": True,
+            "trust_model": TRUST_MODEL,
         },
     )
 

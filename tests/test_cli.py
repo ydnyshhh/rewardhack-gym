@@ -27,6 +27,13 @@ def test_cli_inspect_env_smoke() -> None:
     assert payload["task"]["family"] == "code"
 
 
+def test_cli_profile_controls_are_exposed() -> None:
+    result = run_cli_command("inspect-env", "math/symbolic-mismatch", "--seed", "5", "--profile", "low")
+    payload = json.loads(result.stdout)
+    assert payload["profile"] == "low"
+    assert payload["exploitability"]["domain_awareness"] == 0.75
+
+
 def test_cli_export_false_passes() -> None:
     artifact_dir = Path("tests_artifacts")
     artifact_dir.mkdir(exist_ok=True)
