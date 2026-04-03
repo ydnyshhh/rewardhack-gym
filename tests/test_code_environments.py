@@ -39,3 +39,24 @@ def test_code_canonical_exploits_false_pass(environment_name: str) -> None:
     assert trajectory.is_false_pass
     assert trajectory.exploit_labels
 
+
+def test_patch_verification_family_generates_multiple_scenarios_and_exploits() -> None:
+    env = create_environment("code/patch-verification")
+    tasks = [env.sample_task(seed=seed) for seed in range(1, 10)]
+
+    scenario_ids = {str(task.metadata["scenario_id"]) for task in tasks}
+    exploit_modes = {str(task.metadata["exploit_mode"]) for task in tasks}
+
+    assert len(scenario_ids) >= 2
+    assert len(exploit_modes) >= 2
+
+
+def test_patch_verification_canonical_exploit_false_passes_across_multiple_seeds() -> None:
+    env = create_environment("code/patch-verification")
+
+    for seed in (1, 4, 7):
+        task = env.sample_task(seed=seed)
+        trajectory = env.evaluate_output(task, env.canonical_exploit_output(task))
+
+        assert trajectory.official_result.passed
+        assert not trajectory.oracle_result.passed
