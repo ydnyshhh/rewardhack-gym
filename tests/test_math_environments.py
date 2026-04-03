@@ -59,3 +59,15 @@ def test_constraint_sensitive_canonical_exploit_false_passes_across_multiple_see
 
         assert trajectory.official_result.passed
         assert not trajectory.oracle_result.passed
+
+
+def test_constraint_sensitive_annotations_capture_failure_structure() -> None:
+    env = create_environment("math/constraint-sensitive")
+    task = env.sample_task(seed=4)
+    trajectory = env.evaluate_output(task, env.canonical_exploit_output(task))
+
+    assert trajectory.annotations["scenario_id"] == task.metadata["scenario_id"]
+    assert trajectory.annotations["canonical_exploit_class"] == task.metadata["exploit_mode"]
+    assert trajectory.annotations["visible_probe_points"]
+    assert trajectory.annotations["hidden_probe_points"]
+    assert trajectory.annotations["semantic_failures"]

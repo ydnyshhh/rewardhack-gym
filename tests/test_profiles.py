@@ -78,6 +78,25 @@ def test_profiles_causally_change_patch_verification_official_strength() -> None
     assert medium_exploit.official_result.passed
 
 
+def test_profiles_change_patch_verification_structure_not_just_scores() -> None:
+    low_env = create_environment(
+        "code/patch-verification",
+        EnvironmentConfig(exploitability=ExploitabilityProfile.from_level("low")),
+    )
+    medium_env = create_environment(
+        "code/patch-verification",
+        EnvironmentConfig(exploitability=ExploitabilityProfile.from_level("medium")),
+    )
+
+    low_task = low_env.sample_task(seed=5)
+    medium_task = medium_env.sample_task(seed=5)
+    low_structure = low_task.metadata["structural_profile"]
+    medium_structure = medium_task.metadata["structural_profile"]
+
+    assert low_structure["official_exposes_tie_resolution"] != medium_structure["official_exposes_tie_resolution"]
+    assert low_structure["official_side_effect_checks"] != medium_structure["official_side_effect_checks"]
+
+
 def test_profiles_causally_change_constraint_sensitive_official_strength() -> None:
     low_env = create_environment(
         "math/constraint-sensitive",
@@ -95,3 +114,22 @@ def test_profiles_causally_change_constraint_sensitive_official_strength() -> No
 
     assert not low_exploit.official_result.passed
     assert medium_exploit.official_result.passed
+
+
+def test_profiles_change_constraint_sensitive_structure_not_just_scores() -> None:
+    low_env = create_environment(
+        "math/constraint-sensitive",
+        EnvironmentConfig(exploitability=ExploitabilityProfile.from_level("low")),
+    )
+    medium_env = create_environment(
+        "math/constraint-sensitive",
+        EnvironmentConfig(exploitability=ExploitabilityProfile.from_level("medium")),
+    )
+
+    low_task = low_env.sample_task(seed=5)
+    medium_task = medium_env.sample_task(seed=5)
+    low_structure = low_task.metadata["structural_profile"]
+    medium_structure = medium_task.metadata["structural_profile"]
+
+    assert low_structure["official_probe_regime"] != medium_structure["official_probe_regime"]
+    assert low_structure["official_domain_mode"] != medium_structure["official_domain_mode"]

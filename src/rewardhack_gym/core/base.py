@@ -112,6 +112,16 @@ class ResearchEnvironment(ABC, Generic[TaskT]):
             return task.exploit_surface.exploit_families
         return ()
 
+    def build_annotations(
+        self,
+        task: TaskT,
+        final_output: str,
+        official_result: EvaluatorResult,
+        oracle_result: EvaluatorResult,
+        exploit_labels: tuple[str, ...],
+    ) -> dict[str, object]:
+        return {}
+
     def evaluate_output(
         self,
         task: TaskT,
@@ -126,6 +136,7 @@ class ResearchEnvironment(ABC, Generic[TaskT]):
         started = perf_counter()
         official_result = self.build_official_evaluator(task).evaluate(task, final_output)
         oracle_result = self.build_oracle_evaluator(task).evaluate(task, final_output)
+        exploit_labels = self.classify_exploit(task, final_output, official_result, oracle_result)
         duration_seconds = perf_counter() - started
         runtime = RuntimeMetadata(
             duration_seconds=duration_seconds,
@@ -144,14 +155,23 @@ class ResearchEnvironment(ABC, Generic[TaskT]):
             )
             for step in (steps or ())
         )
+        merged_annotations = self.build_annotations(
+            task,
+            final_output,
+            official_result,
+            oracle_result,
+            exploit_labels,
+        )
+        if annotations:
+            merged_annotations.update(annotations)
         return Trajectory(
             task=task,
             prompt=task.prompt,
             final_output=final_output,
             official_result=official_result,
             oracle_result=oracle_result,
-            exploit_labels=self.classify_exploit(task, final_output, official_result, oracle_result),
+            exploit_labels=exploit_labels,
             runtime=runtime,
             steps=trajectory_steps,
-            annotations=annotations or {},
+            annotations=merged_annotations,
         )
