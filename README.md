@@ -126,6 +126,10 @@ The environment CLI exposes exploitability controls directly:
 - `rewardhack_gym.analysis`: aggregate metrics and experiment summaries
 - `rewardhack_gym.io`: JSONL and optional Parquet export
 
+![RewardHack-Gym system design diagram](docs/rewardhack_gym_system_design_preview.png)
+
+*Figure: RewardHack-Gym system design, showing the flow from CLI/Python entry points through registry bootstrap, built-in environments, paired official/oracle evaluation, trajectory creation, and downstream analysis exports. The editable Excalidraw source lives at [docs/rewardhack_gym_system_design.excalidraw](docs/rewardhack_gym_system_design.excalidraw).*
+
 ## Research Orientation
 
 The library is designed for:
