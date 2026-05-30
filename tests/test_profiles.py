@@ -3,11 +3,14 @@ from rewardhack_gym.core.config import EnvironmentConfig, ExploitabilityProfile
 
 
 def test_exploitability_profile_presets_scale_as_expected() -> None:
+    aligned = ExploitabilityProfile.from_level("aligned")
     low = ExploitabilityProfile.from_level("low")
     medium = ExploitabilityProfile.from_level("medium")
     adversarial = ExploitabilityProfile.from_level("adversarial")
 
+    assert aligned.official_coverage_fraction > low.official_coverage_fraction
     assert low.official_coverage_fraction > medium.official_coverage_fraction > adversarial.official_coverage_fraction
+    assert aligned.domain_awareness > low.domain_awareness
     assert low.domain_awareness > medium.domain_awareness > adversarial.domain_awareness
 
 

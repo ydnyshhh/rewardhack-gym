@@ -1,0 +1,44 @@
+[project]
+name = "rewardhack-prime"
+version = "0.1.0"
+description = "Prime Intellect Verifiers taskset for RewardHack-Gym reward hacking benchmarks."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "Yadnyesh" },
+]
+keywords = [
+  "reward-hacking",
+  "verifiers",
+  "prime-intellect",
+  "rl-environments",
+  "benchmark",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+  "rewardhack-gym>=0.1.0",
+  "verifiers>=0.1.14",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["rewardhack_prime"]
+
+[tool.uv.sources]
+rewardhack-gym = { path = "../..", editable = true }
+
+[tool.verifiers.eval]
+num_examples = 100
+rollouts_per_example = 1
