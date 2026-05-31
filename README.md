@@ -169,6 +169,6 @@ uv run pytest
 
 ## Execution Model
 
-The current code-execution harness is designed for trusted local research workflows. It is intentionally lightweight and is not a security sandbox. Environment execution should therefore be treated as `trusted-local-only` unless and until a stronger sandboxed runner is added.
+Code execution now has an explicit backend layer. `LocalTrustedBackend` preserves the old trusted-local runner for research compatibility, while `SubprocessBackend` adds child-process execution with timeouts, process-tree cleanup, output limits, blocked imports/filesystem escape hatches, and temporary working directories. `DockerBackend` adds `--network none` and container resource limits when Docker is available, and `PrimeSandboxBackend` is reserved for a future Prime-native runner.
 
 See [docs/families.md](docs/families.md), [docs/architecture.md](docs/architecture.md), [docs/adding-environment.md](docs/adding-environment.md), [docs/trace-export.md](docs/trace-export.md), [docs/annotations.md](docs/annotations.md), [docs/mech-interp.md](docs/mech-interp.md), and [docs/execution-model.md](docs/execution-model.md) for the package design, family guide, mech-interp-prep workflow, and extension workflow.

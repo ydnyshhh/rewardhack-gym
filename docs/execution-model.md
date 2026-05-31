@@ -1,39 +1,48 @@
 # Execution Model
 
-RewardHack-Gym currently supports lightweight local execution for coding environments through a trusted research runner.
+RewardHack-Gym now exposes code execution through an explicit backend interface. The old in-process runner is still available as `LocalTrustedBackend` for trusted research compatibility, but production integrations should use `SubprocessBackend`, `DockerBackend`, or a future `PrimeSandboxBackend`.
 
 ## Trust Model
 
-- code execution is intended for trusted local research use
-- the current runner is not a hardened security sandbox
-- environment authors should assume submitted code may be adversarial unless run in a stronger external sandbox
+- `LocalTrustedBackend` executes submitted code in the current Python process and is trusted-local-only.
+- `SubprocessBackend` runs submitted function cases in a child process with timeouts, process-tree kill on timeout, stdout/stderr limits, output-object limits, blocked imports, blocked filesystem builtins, and an isolated temporary working directory.
+- `DockerBackend` runs the same worker inside a per-run container with `--network none`, memory limits, and CPU limits when Docker is available.
+- `PrimeSandboxBackend` is a placeholder for a future Prime-native execution backend.
 
 ## Current Behavior
 
-The runtime intentionally keeps the harness small and deterministic:
+The backend result schema is:
 
-- parses source with Python `ast`
-- executes submissions in a restricted namespace
-- exposes only a curated set of builtins and helper modules
-- records the trust model in checker diagnostics
+```python
+@dataclass
+class ExecutionResult:
+    status: Literal[
+        "passed",
+        "failed",
+        "syntax_error",
+        "runtime_error",
+        "timeout",
+        "memory_limit",
+        "sandbox_error",
+    ]
+    case_results: list[dict]
+    stdout: str
+    stderr: str
+    duration_seconds: float
+    backend: str
+```
 
-This improves ergonomics for local experiments, but it is not sufficient as a secure multi-tenant execution boundary.
+Use `run_function_cases` / `run_function_cases_sync` for backend-mediated execution. Existing environment checkers that still use the legacy `compile_submission(...).symbol` path should be treated as trusted-local compatibility code until migrated to backend-mediated case execution.
 
 ## Near-Term Guidance
 
 If you use RewardHack-Gym today:
 
-- run coding environments only on trusted machines
-- do not expose the current execution harness as a public service
-- prefer offline or isolated worker execution for larger experiments
+- prefer `SubprocessBackend` for local adversarial testing
+- prefer `DockerBackend` for stronger local isolation when Docker is available
+- do not expose `LocalTrustedBackend` as a public service
+- use a Prime-native sandbox once available for hosted multi-tenant execution
 
 ## Upgrade Path
 
-The long-term production path is to move code execution behind a stronger runner model, for example:
-
-- process-level sandboxing
-- containerized or VM-backed execution
-- per-run filesystem and network isolation
-- explicit resource and syscall controls
-
-The package architecture is set up so those execution upgrades can be introduced without changing the task / verifier / oracle abstractions.
+The package architecture keeps task, verifier, and oracle abstractions separate from the execution backend. That makes it possible to migrate each checker from legacy in-process calls to backend-mediated cases without changing task schemas.
