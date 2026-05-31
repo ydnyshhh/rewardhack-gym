@@ -8,6 +8,7 @@ from rewardhack_gym.envs.code.runtime import (
     LocalTrustedBackend,
     PrimeSandboxBackend,
     SubprocessBackend,
+    compile_submission,
     run_function_cases_sync,
 )
 
@@ -41,6 +42,18 @@ def test_subprocess_backend_runs_function_cases() -> None:
     assert result.status == "passed"
     assert result.backend == "subprocess"
     assert result.case_results[0]["passed"] is True
+
+
+def test_compile_submission_is_ast_only_and_does_not_execute_top_level_code() -> None:
+    result = compile_submission(
+        "raise RuntimeError('should not execute')\n"
+        "def solve():\n"
+        "    return 'ok'\n",
+        "solve",
+    )
+
+    assert result.symbol == "solve"
+    assert result.diagnostics["symbol_found"] is True
 
 
 def test_subprocess_backend_times_out_and_worker_recovers() -> None:

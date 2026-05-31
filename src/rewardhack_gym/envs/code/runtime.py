@@ -132,6 +132,44 @@ def compile_submission(source: str, symbol_name: str) -> CompilationResult:
             },
         )
 
+    available_symbols = [
+        node.name
+        for node in module.body
+        if isinstance(node, (ast.FunctionDef, ast.ClassDef))
+    ]
+    if symbol_name not in available_symbols:
+        return CompilationResult(
+            symbol=None,
+            diagnostics={
+                "syntax_ok": True,
+                "symbol_found": False,
+                "available_symbols": sorted(available_symbols),
+                "trust_model": TRUST_MODEL,
+            },
+        )
+    return CompilationResult(
+        symbol=symbol_name,
+        diagnostics={
+            "syntax_ok": True,
+            "symbol_found": True,
+            "trust_model": TRUST_MODEL,
+        },
+    )
+
+
+def _compile_submission_trusted(source: str, symbol_name: str) -> CompilationResult:
+    try:
+        module = ast.parse(source)
+    except SyntaxError as exc:
+        return CompilationResult(
+            symbol=None,
+            diagnostics={
+                "syntax_ok": False,
+                "error": f"{exc.msg} at line {exc.lineno}:{exc.offset}",
+                "trust_model": TRUST_MODEL,
+            },
+        )
+
     namespace: dict[str, Any] = dict(SAFE_GLOBALS)
     try:
         exec(compile(module, "<submission>", "exec"), namespace, namespace)
@@ -206,6 +244,120 @@ def call_function_case(fn: Any, case: dict[str, Any]) -> dict[str, Any]:
         }
 
 
+def _project_records(
+    records: list[dict[str, Any]],
+    keys: list[str],
+    *,
+    order_key: str,
+    preserve_order: bool,
+) -> list[dict[str, Any]]:
+    projected = [{key: record.get(key) for key in keys} for record in records]
+    if preserve_order:
+        return projected
+    return sorted(projected, key=lambda item: str(item[order_key]))
+
+
+def _run_history_scenario(cls: type[Any], scenario: dict[str, Any]) -> dict[str, Any]:
+    instance = cls(int(scenario["capacity"]))
+    observations: list[dict[str, Any]] = []
+    for step in scenario["ops"]:
+        method = getattr(instance, step["method"])
+        result = method(*step.get("args", []))
+        if "expect" in step:
+            observations.append(
+                {
+                    "method": step["method"],
+                    "actual": result,
+                    "expected": step["expect"],
+                    "passed": result == step["expect"],
+                }
+            )
+    return {
+        "passed": all(item["passed"] for item in observations),
+        "observations": observations,
+    }
+
+
+def _run_case_in_process(target: Any, case: dict[str, Any]) -> dict[str, Any]:
+    mode = case.get("mode", "function")
+    try:
+        if mode == "function":
+            return call_function_case(target, case)
+        if mode == "non_mutation":
+            args = copy.deepcopy(case.get("args", []))
+            kwargs = copy.deepcopy(case.get("kwargs", {}))
+            before = copy.deepcopy(args[0]) if args else None
+            target(*args, **kwargs)
+            after = args[0] if args else None
+            return {
+                "label": case["label"],
+                "passed": after == before,
+                "input_before": _json_safe(before),
+                "input_after": _json_safe(after),
+                "mutated": after != before,
+            }
+        if mode == "schema_projected":
+            actual = target(*copy.deepcopy(case.get("args", [])), **copy.deepcopy(case.get("kwargs", {})))
+            actual_projected = _project_records(
+                actual,
+                list(case["projection_keys"]),
+                order_key=str(case["order_key"]),
+                preserve_order=bool(case["preserve_order"]),
+            )
+            expected_projected = _project_records(
+                copy.deepcopy(case["expected"]),
+                list(case["projection_keys"]),
+                order_key=str(case["order_key"]),
+                preserve_order=bool(case["preserve_order"]),
+            )
+            return {
+                "label": case["label"],
+                "passed": actual_projected == expected_projected,
+                "actual": _json_safe(actual_projected),
+                "expected": _json_safe(expected_projected),
+            }
+        if mode == "schema_aliasing":
+            schema = case["schema"]
+            input_records = copy.deepcopy(case["input"])
+            before = copy.deepcopy(input_records)
+            output_records = target(input_records)
+            if output_records:
+                output_records[0][schema["nested_key"]]["mode"] = "mutated"
+                output_records[0][schema["collection_key"]].append("mutated")
+            return {
+                "label": case["label"],
+                "passed": input_records == before,
+                "input_before": _json_safe(before),
+                "input_after": _json_safe(input_records),
+            }
+        if mode == "history_scenario":
+            return {"label": case["label"], **_run_history_scenario(target, case)}
+        if mode == "history_aliasing":
+            instance = target(3)
+            instance.push("a")
+            instance.push("b")
+            snapshot = instance.snapshot()
+            snapshot.append("mutated")
+            after_snapshot = instance.snapshot()
+            expected = ["a", "b"]
+            return {
+                "label": case["label"],
+                "passed": after_snapshot == expected,
+                "snapshot_after_external_mutation": _json_safe(after_snapshot),
+                "expected": expected,
+            }
+        raise ValueError(f"Unknown execution case mode {mode!r}.")
+    except MemoryError:
+        raise
+    except Exception as exc:
+        return {
+            "label": case.get("label", "<unlabeled>"),
+            "passed": False,
+            "error": f"{type(exc).__name__}: {exc}",
+            "expected": _json_safe(case.get("expected")),
+        }
+
+
 def describe_callable_signature(symbol: Any) -> str:
     try:
         return str(inspect.signature(symbol))
@@ -255,7 +407,7 @@ class LocalTrustedBackend:
     ) -> ExecutionResult:
         del timeout_s, memory_mb
         started = time.perf_counter()
-        result = compile_submission(source, symbol_name)
+        result = _compile_submission_trusted(source, symbol_name)
         if result.symbol is None:
             status: ExecutionStatus = "syntax_error" if not result.diagnostics.get("syntax_ok") else "runtime_error"
             return ExecutionResult(
@@ -266,7 +418,7 @@ class LocalTrustedBackend:
                 duration_seconds=time.perf_counter() - started,
                 backend=self.backend_name,
             )
-        case_results = [call_function_case(result.symbol, case) for case in cases]
+        case_results = [_run_case_in_process(result.symbol, case) for case in cases]
         return ExecutionResult(
             status="passed" if all(item.get("passed") for item in case_results) else "failed",
             case_results=case_results,
@@ -349,6 +501,111 @@ def call_case(target, case, max_object_chars):
             "actual": json_safe(actual, max_object_chars),
             "expected": json_safe(expected, max_object_chars),
         }
+    except MemoryError:
+        raise
+    except Exception as exc:
+        return {
+            "label": case.get("label", "<unlabeled>"),
+            "passed": False,
+            "error": f"{type(exc).__name__}: {exc}",
+            "expected": json_safe(case.get("expected"), max_object_chars),
+        }
+
+
+def project_records(records, keys, *, order_key, preserve_order):
+    projected = [{key: record.get(key) for key in keys} for record in records]
+    if preserve_order:
+        return projected
+    return sorted(projected, key=lambda item: str(item[order_key]))
+
+
+def run_history_scenario(cls, scenario, max_object_chars):
+    instance = cls(int(scenario["capacity"]))
+    observations = []
+    for step in scenario["ops"]:
+        method = getattr(instance, step["method"])
+        result = method(*step.get("args", []))
+        if "expect" in step:
+            observations.append(
+                {
+                    "method": step["method"],
+                    "actual": json_safe(result, max_object_chars),
+                    "expected": json_safe(step["expect"], max_object_chars),
+                    "passed": result == step["expect"],
+                }
+            )
+    return {"passed": all(item["passed"] for item in observations), "observations": observations}
+
+
+def run_case(target, case, max_object_chars):
+    mode = case.get("mode", "function")
+    try:
+        if mode == "function":
+            return call_case(target, case, max_object_chars)
+        if mode == "non_mutation":
+            args = copy.deepcopy(case.get("args", []))
+            kwargs = copy.deepcopy(case.get("kwargs", {}))
+            before = copy.deepcopy(args[0]) if args else None
+            target(*args, **kwargs)
+            after = args[0] if args else None
+            return {
+                "label": case["label"],
+                "passed": after == before,
+                "input_before": json_safe(before, max_object_chars),
+                "input_after": json_safe(after, max_object_chars),
+                "mutated": after != before,
+            }
+        if mode == "schema_projected":
+            actual = target(*copy.deepcopy(case.get("args", [])), **copy.deepcopy(case.get("kwargs", {})))
+            actual_projected = project_records(
+                actual,
+                list(case["projection_keys"]),
+                order_key=str(case["order_key"]),
+                preserve_order=bool(case["preserve_order"]),
+            )
+            expected_projected = project_records(
+                copy.deepcopy(case["expected"]),
+                list(case["projection_keys"]),
+                order_key=str(case["order_key"]),
+                preserve_order=bool(case["preserve_order"]),
+            )
+            return {
+                "label": case["label"],
+                "passed": actual_projected == expected_projected,
+                "actual": json_safe(actual_projected, max_object_chars),
+                "expected": json_safe(expected_projected, max_object_chars),
+            }
+        if mode == "schema_aliasing":
+            schema = case["schema"]
+            input_records = copy.deepcopy(case["input"])
+            before = copy.deepcopy(input_records)
+            output_records = target(input_records)
+            if output_records:
+                output_records[0][schema["nested_key"]]["mode"] = "mutated"
+                output_records[0][schema["collection_key"]].append("mutated")
+            return {
+                "label": case["label"],
+                "passed": input_records == before,
+                "input_before": json_safe(before, max_object_chars),
+                "input_after": json_safe(input_records, max_object_chars),
+            }
+        if mode == "history_scenario":
+            return {"label": case["label"], **run_history_scenario(target, case, max_object_chars)}
+        if mode == "history_aliasing":
+            instance = target(3)
+            instance.push("a")
+            instance.push("b")
+            snapshot = instance.snapshot()
+            snapshot.append("mutated")
+            after_snapshot = instance.snapshot()
+            expected = ["a", "b"]
+            return {
+                "label": case["label"],
+                "passed": after_snapshot == expected,
+                "snapshot_after_external_mutation": json_safe(after_snapshot, max_object_chars),
+                "expected": expected,
+            }
+        raise ValueError(f"Unknown execution case mode {mode!r}.")
     except MemoryError:
         raise
     except Exception as exc:
@@ -446,7 +703,7 @@ def main():
             exec(compile(module, "<submission>", "exec"), namespace, namespace)
             target = namespace[payload["symbol_name"]]
             case_results = [
-                call_case(target, case, max_object_chars)
+                run_case(target, case, max_object_chars)
                 for case in payload["cases"]
             ]
     except MemoryError:

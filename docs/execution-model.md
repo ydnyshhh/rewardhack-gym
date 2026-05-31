@@ -32,7 +32,7 @@ class ExecutionResult:
     backend: str
 ```
 
-Use `run_function_cases` / `run_function_cases_sync` for backend-mediated execution. Existing environment checkers that still use the legacy `compile_submission(...).symbol` path should be treated as trusted-local compatibility code until migrated to backend-mediated case execution.
+Use `run_function_cases` / `run_function_cases_sync` for backend-mediated execution. Built-in code environment checkers now send behavioral cases through the selected backend. `compile_submission` is limited to AST-level syntax and symbol-presence checks; it does not execute submissions.
 
 ## Near-Term Guidance
 
@@ -45,4 +45,4 @@ If you use RewardHack-Gym today:
 
 ## Upgrade Path
 
-The package architecture keeps task, verifier, and oracle abstractions separate from the execution backend. That makes it possible to migrate each checker from legacy in-process calls to backend-mediated cases without changing task schemas.
+The package architecture keeps task, verifier, and oracle abstractions separate from the execution backend, so Prime can replace the local backend with a hosted sandbox without changing task schemas.
