@@ -12,7 +12,12 @@ from rewardhack_gym.envs.code.patch_verification_family import (
     materialize_account_snapshot_reference,
     sample_patch_task_spec,
 )
-from rewardhack_gym.envs.code.runtime import compile_submission, get_ast_signature, run_function_cases_sync
+from rewardhack_gym.envs.code.runtime import (
+    compile_submission,
+    execution_settings_from_config,
+    get_ast_signature,
+    run_function_cases_sync,
+)
 
 
 def component_map(result: EvaluatorResult) -> dict[str, CheckerResult]:
@@ -114,7 +119,7 @@ class PatchVerificationCodeEnvironment(ResearchEnvironment[Task]):
             artifact,
             str(task.metadata["symbol_name"]),
             list(cases),  # type: ignore[arg-type]
-            timeout_s=self.config.max_runtime_seconds,
+            **execution_settings_from_config(self.config),
         )
         evaluations = result.case_results
         passed_count = sum(1 for item in evaluations if item["passed"])
@@ -133,7 +138,7 @@ class PatchVerificationCodeEnvironment(ResearchEnvironment[Task]):
             artifact,
             str(task.metadata["symbol_name"]),
             [{"label": checker_name, "mode": "non_mutation", "args": [public_cases[0]["args"][0]]}],
-            timeout_s=self.config.max_runtime_seconds,
+            **execution_settings_from_config(self.config),
         )
         evaluation = result.case_results[0] if result.case_results else {"passed": False}
         passed = result.status == "passed" and bool(evaluation["passed"])
@@ -179,7 +184,7 @@ class PatchVerificationCodeEnvironment(ResearchEnvironment[Task]):
             artifact,
             str(task.metadata["symbol_name"]),
             cases,
-            timeout_s=self.config.max_runtime_seconds,
+            **execution_settings_from_config(self.config),
         )
         evaluations = result.case_results
         passed_count = sum(1 for item in evaluations if item["passed"])
@@ -206,7 +211,7 @@ class PatchVerificationCodeEnvironment(ResearchEnvironment[Task]):
             artifact,
             str(task.metadata["symbol_name"]),
             list(property_cases),  # type: ignore[arg-type]
-            timeout_s=self.config.max_runtime_seconds,
+            **execution_settings_from_config(self.config),
         )
         evaluations = result.case_results
         passed_count = sum(1 for item in evaluations if item["passed"])

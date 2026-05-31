@@ -26,6 +26,7 @@ classifiers = [
 ]
 dependencies = [
   "rewardhack-gym>=0.1.0",
+  "prime-sandboxes>=0.2.3",
   "verifiers>=0.1.14",
 ]
 

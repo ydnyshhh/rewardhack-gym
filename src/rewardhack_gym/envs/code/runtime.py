@@ -11,11 +11,13 @@ import itertools
 import json
 import math
 import os
+from pathlib import Path
 import re
 import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
@@ -35,6 +37,9 @@ DEFAULT_MEMORY_LIMIT_MB = 256
 DEFAULT_STDOUT_LIMIT_CHARS = 20_000
 DEFAULT_STDERR_LIMIT_CHARS = 20_000
 DEFAULT_MAX_OUTPUT_OBJECT_SIZE = 20_000
+DEFAULT_PRIME_SANDBOX_IMAGE = "python:3.12-slim"
+DEFAULT_PRIME_SANDBOX_TIMEOUT_MINUTES = 10
+DEFAULT_PRIME_SANDBOX_CPU_CORES = 1
 
 TRUST_MODEL = "trusted-local-only"
 TRUST_MODEL_WARNING = (
@@ -780,10 +785,12 @@ class SubprocessBackend:
             "max_output_object_size": self.max_output_object_size,
         }
         return _run_worker_command(
-            [sys.executable, "-I", "-B", "-c", _SUBPROCESS_WORKER_SOURCE],
+            [_worker_python_executable(), "-I", "-B", "-c", _SUBPROCESS_WORKER_SOURCE],
             payload,
             backend=self.backend_name,
             timeout_s=timeout_s,
+            stdout_limit_chars=self.stdout_limit_chars,
+            stderr_limit_chars=self.stderr_limit_chars,
         )
 
 
@@ -844,11 +851,30 @@ class DockerBackend(SubprocessBackend):
             payload,
             backend=self.backend_name,
             timeout_s=timeout_s,
+            stdout_limit_chars=self.stdout_limit_chars,
+            stderr_limit_chars=self.stderr_limit_chars,
         )
 
 
 class PrimeSandboxBackend:
     backend_name = "prime_sandbox"
+
+    def __init__(
+        self,
+        *,
+        image: str = DEFAULT_PRIME_SANDBOX_IMAGE,
+        timeout_minutes: int = DEFAULT_PRIME_SANDBOX_TIMEOUT_MINUTES,
+        cpu_cores: int = DEFAULT_PRIME_SANDBOX_CPU_CORES,
+        stdout_limit_chars: int = DEFAULT_STDOUT_LIMIT_CHARS,
+        stderr_limit_chars: int = DEFAULT_STDERR_LIMIT_CHARS,
+        max_output_object_size: int = DEFAULT_MAX_OUTPUT_OBJECT_SIZE,
+    ) -> None:
+        self.image = image
+        self.timeout_minutes = timeout_minutes
+        self.cpu_cores = cpu_cores
+        self.stdout_limit_chars = stdout_limit_chars
+        self.stderr_limit_chars = stderr_limit_chars
+        self.max_output_object_size = max_output_object_size
 
     async def run_function_cases(
         self,
@@ -858,15 +884,266 @@ class PrimeSandboxBackend:
         timeout_s: float,
         memory_mb: int,
     ) -> ExecutionResult:
-        del source, symbol_name, cases, timeout_s, memory_mb
+        try:
+            from prime_sandboxes import AsyncSandboxClient, CreateSandboxRequest
+        except ImportError as exc:
+            return self._missing_sdk_result(exc)
+
+        started = time.perf_counter()
+        sandbox_id: str | None = None
+        with _worker_files(
+            _build_worker_payload(
+                source,
+                symbol_name,
+                cases,
+                memory_mb=memory_mb,
+                stdout_limit_chars=self.stdout_limit_chars,
+                stderr_limit_chars=self.stderr_limit_chars,
+                max_output_object_size=self.max_output_object_size,
+            )
+        ) as (worker_path, payload_path):
+            try:
+                async with AsyncSandboxClient() as client:
+                    request = CreateSandboxRequest(**self._create_request_kwargs(memory_mb))
+                    sandbox = await client.create(request)
+                    sandbox_id = str(sandbox.id)
+                    await client.wait_for_creation(sandbox_id)
+                    await client.upload_file(sandbox_id, "/tmp/rewardhack_worker.py", str(worker_path))
+                    await client.upload_file(sandbox_id, "/tmp/rewardhack_payload.json", str(payload_path))
+                    command_result = await client.execute_command(
+                        sandbox_id,
+                        "python -I -B /tmp/rewardhack_worker.py < /tmp/rewardhack_payload.json",
+                        timeout=_prime_command_timeout_seconds(timeout_s),
+                    )
+            except Exception as exc:
+                return _prime_exception_result(exc, started, self.backend_name)
+            finally:
+                if sandbox_id is not None:
+                    try:
+                        await client.delete(sandbox_id)  # type: ignore[possibly-undefined]
+                    except Exception:
+                        pass
+
+        return _execution_result_from_worker_stdout(
+            str(getattr(command_result, "stdout", "")),
+            str(getattr(command_result, "stderr", "")),
+            int(getattr(command_result, "exit_code", getattr(command_result, "return_code", 0))),
+            started=started,
+            backend=self.backend_name,
+            stdout_limit_chars=self.stdout_limit_chars,
+            stderr_limit_chars=self.stderr_limit_chars,
+        )
+
+    def run_function_cases_sync(
+        self,
+        source: str,
+        symbol_name: str,
+        cases: list[dict[str, Any]],
+        timeout_s: float = DEFAULT_TIMEOUT_SECONDS,
+        memory_mb: int = DEFAULT_MEMORY_LIMIT_MB,
+    ) -> ExecutionResult:
+        try:
+            from prime_sandboxes import APIClient, CreateSandboxRequest, SandboxClient
+        except ImportError as exc:
+            return self._missing_sdk_result(exc)
+
+        started = time.perf_counter()
+        sandbox_id: str | None = None
+        with _worker_files(
+            _build_worker_payload(
+                source,
+                symbol_name,
+                cases,
+                memory_mb=memory_mb,
+                stdout_limit_chars=self.stdout_limit_chars,
+                stderr_limit_chars=self.stderr_limit_chars,
+                max_output_object_size=self.max_output_object_size,
+            )
+        ) as (worker_path, payload_path):
+            try:
+                client = SandboxClient(APIClient())
+                request = CreateSandboxRequest(**self._create_request_kwargs(memory_mb))
+                sandbox = client.create(request)
+                sandbox_id = str(sandbox.id)
+                client.wait_for_creation(sandbox_id)
+                client.upload_file(sandbox_id, "/tmp/rewardhack_worker.py", str(worker_path))
+                client.upload_file(sandbox_id, "/tmp/rewardhack_payload.json", str(payload_path))
+                command_result = client.execute_command(
+                    sandbox_id,
+                    "python -I -B /tmp/rewardhack_worker.py < /tmp/rewardhack_payload.json",
+                    timeout=_prime_command_timeout_seconds(timeout_s),
+                )
+            except Exception as exc:
+                return _prime_exception_result(exc, started, self.backend_name)
+            finally:
+                if sandbox_id is not None:
+                    try:
+                        client.delete(sandbox_id)  # type: ignore[possibly-undefined]
+                    except Exception:
+                        pass
+
+        return _execution_result_from_worker_stdout(
+            str(getattr(command_result, "stdout", "")),
+            str(getattr(command_result, "stderr", "")),
+            int(getattr(command_result, "exit_code", getattr(command_result, "return_code", 0))),
+            started=started,
+            backend=self.backend_name,
+            stdout_limit_chars=self.stdout_limit_chars,
+            stderr_limit_chars=self.stderr_limit_chars,
+        )
+
+    def _create_request_kwargs(self, memory_mb: int) -> dict[str, Any]:
+        return {
+            "name": f"rewardhack-run-{os.getpid()}",
+            "docker_image": self.image,
+            "labels": ["rewardhack-gym", "code-execution"],
+            "timeout_minutes": self.timeout_minutes,
+            "network_access": False,
+            "cpu_cores": self.cpu_cores,
+            "memory_gb": max(1, math.ceil(memory_mb / 1024)),
+        }
+
+    def _missing_sdk_result(self, exc: ImportError) -> ExecutionResult:
         return ExecutionResult(
             status="sandbox_error",
             case_results=[],
             stdout="",
-            stderr="PrimeSandboxBackend is reserved for a future Prime-native sandbox.",
+            stderr=(
+                "PrimeSandboxBackend requires the optional prime-sandboxes SDK. "
+                "Install rewardhack-gym with the prime-sandbox extra or install prime-sandboxes directly. "
+                f"Original error: {exc}"
+            ),
             duration_seconds=0.0,
             backend=self.backend_name,
         )
+
+
+def _build_worker_payload(
+    source: str,
+    symbol_name: str,
+    cases: list[dict[str, Any]],
+    *,
+    memory_mb: int,
+    stdout_limit_chars: int,
+    stderr_limit_chars: int,
+    max_output_object_size: int,
+) -> dict[str, Any]:
+    return {
+        "source": source,
+        "symbol_name": symbol_name,
+        "cases": cases,
+        "memory_mb": memory_mb,
+        "stdout_limit_chars": stdout_limit_chars,
+        "stderr_limit_chars": stderr_limit_chars,
+        "max_output_object_size": max_output_object_size,
+    }
+
+
+def _prime_command_timeout_seconds(timeout_s: float) -> int:
+    return max(1, math.ceil(timeout_s))
+
+
+class _worker_files:
+    def __init__(self, payload: dict[str, Any]) -> None:
+        self.payload = payload
+        self._tmp: tempfile.TemporaryDirectory[str] | None = None
+
+    def __enter__(self) -> tuple[Path, Path]:
+        self._tmp = _temporary_directory(prefix="rewardhack_prime_exec_")
+        directory = Path(self._tmp.name)
+        worker_path = directory / "worker.py"
+        payload_path = directory / "payload.json"
+        worker_path.write_text(_SUBPROCESS_WORKER_SOURCE, encoding="utf-8")
+        payload_path.write_text(json.dumps(self.payload), encoding="utf-8")
+        return worker_path, payload_path
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        if self._tmp is not None:
+            self._tmp.cleanup()
+
+
+def _execution_temp_dir() -> str | None:
+    configured = os.environ.get("REWARDHACK_EXEC_TMPDIR")
+    if configured:
+        return configured
+    if os.name == "nt" and os.path.isdir("C:\\tmp"):
+        return "C:\\tmp"
+    return None
+
+
+def _temporary_directory(prefix: str) -> tempfile.TemporaryDirectory[str]:
+    preferred_dir = _execution_temp_dir()
+    try:
+        return tempfile.TemporaryDirectory(
+            prefix=prefix,
+            dir=preferred_dir,
+            ignore_cleanup_errors=True,
+        )
+    except OSError:
+        return tempfile.TemporaryDirectory(prefix=prefix, ignore_cleanup_errors=True)
+
+
+def _prime_exception_result(exc: Exception, started: float, backend: str) -> ExecutionResult:
+    name = type(exc).__name__
+    status: ExecutionStatus
+    if name in {"CommandTimeoutError", "SandboxTimeoutError"}:
+        status = "timeout"
+    elif name == "SandboxOOMError":
+        status = "memory_limit"
+    else:
+        status = "sandbox_error"
+    return ExecutionResult(
+        status=status,
+        case_results=[],
+        stdout="",
+        stderr=f"{name}: {exc}",
+        duration_seconds=time.perf_counter() - started,
+        backend=backend,
+    )
+
+
+def _execution_result_from_worker_stdout(
+    stdout: str,
+    stderr: str,
+    exit_code: int,
+    *,
+    started: float,
+    backend: str,
+    stdout_limit_chars: int,
+    stderr_limit_chars: int,
+) -> ExecutionResult:
+    duration = time.perf_counter() - started
+    if exit_code != 0 and not stdout:
+        return ExecutionResult(
+            status="memory_limit" if exit_code in {-9, 137} else "sandbox_error",
+            case_results=[],
+            stdout="",
+            stderr=_truncate_text(stderr or f"Worker exited with status {exit_code}.", stderr_limit_chars),
+            duration_seconds=duration,
+            backend=backend,
+        )
+    try:
+        decoded = json.loads(stdout)
+    except json.JSONDecodeError:
+        return ExecutionResult(
+            status="sandbox_error",
+            case_results=[],
+            stdout=_truncate_text(stdout or "", stdout_limit_chars),
+            stderr=_truncate_text(stderr or "Worker produced invalid output.", stderr_limit_chars),
+            duration_seconds=duration,
+            backend=backend,
+        )
+    worker_stderr = str(decoded.get("stderr", ""))
+    if stderr:
+        worker_stderr = (worker_stderr + "\n" + stderr).strip()
+    return ExecutionResult(
+        status=decoded.get("status", "sandbox_error"),
+        case_results=list(decoded.get("case_results", [])),
+        stdout=str(decoded.get("stdout", "")),
+        stderr=worker_stderr,
+        duration_seconds=float(decoded.get("duration_seconds", duration)),
+        backend=backend,
+    )
 
 
 def _run_worker_command(
@@ -875,9 +1152,11 @@ def _run_worker_command(
     *,
     backend: str,
     timeout_s: float,
+    stdout_limit_chars: int = DEFAULT_STDOUT_LIMIT_CHARS,
+    stderr_limit_chars: int = DEFAULT_STDERR_LIMIT_CHARS,
 ) -> ExecutionResult:
     started = time.perf_counter()
-    cwd_manager = tempfile.TemporaryDirectory(prefix="rewardhack_exec_", ignore_cleanup_errors=True)
+    cwd_manager = _temporary_directory(prefix="rewardhack_exec_")
     try:
         cwd = cwd_manager.__enter__()
     except OSError:
@@ -899,16 +1178,28 @@ def _run_worker_command(
             creationflags=creationflags,
             **popen_kwargs,
         )
+        timed_out = False
+
+        def timeout_worker() -> None:
+            nonlocal timed_out
+            if proc.poll() is None:
+                timed_out = True
+                _kill_process_tree(proc)
+
+        timer = threading.Timer(timeout_s, timeout_worker)
+        timer.daemon = True
+        timer.start()
         try:
-            stdout, stderr = proc.communicate(json.dumps(payload), timeout=timeout_s)
-        except subprocess.TimeoutExpired:
-            _kill_process_tree(proc)
-            stdout, stderr = proc.communicate()
+            stdout, stderr = proc.communicate(json.dumps(payload))
+        finally:
+            timer.cancel()
+
+        if timed_out:
             return ExecutionResult(
                 status="timeout",
                 case_results=[],
-                stdout=_truncate_text(stdout or "", DEFAULT_STDOUT_LIMIT_CHARS),
-                stderr=_truncate_text(stderr or "Execution timed out.", DEFAULT_STDERR_LIMIT_CHARS),
+                stdout=_truncate_text(stdout or "", stdout_limit_chars),
+                stderr=_truncate_text(stderr or "Execution timed out.", stderr_limit_chars),
                 duration_seconds=time.perf_counter() - started,
                 backend=backend,
             )
@@ -933,7 +1224,7 @@ def _run_worker_command(
             status="memory_limit" if proc.returncode in {-9, 137} else "sandbox_error",
             case_results=[],
             stdout="",
-            stderr=_truncate_text(stderr or f"Worker exited with status {proc.returncode}.", DEFAULT_STDERR_LIMIT_CHARS),
+            stderr=_truncate_text(stderr or f"Worker exited with status {proc.returncode}.", stderr_limit_chars),
             duration_seconds=duration,
             backend=backend,
         )
@@ -943,8 +1234,8 @@ def _run_worker_command(
         return ExecutionResult(
             status="sandbox_error",
             case_results=[],
-            stdout=_truncate_text(stdout or "", DEFAULT_STDOUT_LIMIT_CHARS),
-            stderr=_truncate_text(stderr or "Worker produced invalid output.", DEFAULT_STDERR_LIMIT_CHARS),
+            stdout=_truncate_text(stdout or "", stdout_limit_chars),
+            stderr=_truncate_text(stderr or "Worker produced invalid output.", stderr_limit_chars),
             duration_seconds=duration,
             backend=backend,
         )
@@ -965,12 +1256,16 @@ def _kill_process_tree(proc: subprocess.Popen[str]) -> None:
     if proc.poll() is not None:
         return
     if os.name == "nt":
-        subprocess.run(
-            ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-        )
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+                timeout=5.0,
+            )
+        except subprocess.TimeoutExpired:
+            pass
     else:
         try:
             os.killpg(proc.pid, signal.SIGKILL)
@@ -982,17 +1277,72 @@ def _kill_process_tree(proc: subprocess.Popen[str]) -> None:
         pass
 
 
-def get_execution_backend(name: str | None = None) -> ExecutionBackend:
+def _worker_python_executable() -> str:
+    if os.name == "nt":
+        base_executable = getattr(sys, "_base_executable", "")
+        if base_executable:
+            return str(base_executable)
+    return sys.executable
+
+
+def get_execution_backend(
+    name: str | None = None,
+    *,
+    stdout_limit_chars: int = DEFAULT_STDOUT_LIMIT_CHARS,
+    stderr_limit_chars: int = DEFAULT_STDERR_LIMIT_CHARS,
+    max_output_object_size: int = DEFAULT_MAX_OUTPUT_OBJECT_SIZE,
+    prime_sandbox_image: str = DEFAULT_PRIME_SANDBOX_IMAGE,
+    prime_sandbox_timeout_minutes: int = DEFAULT_PRIME_SANDBOX_TIMEOUT_MINUTES,
+    prime_sandbox_cpu_cores: int = DEFAULT_PRIME_SANDBOX_CPU_CORES,
+) -> ExecutionBackend:
     backend_name = (name or os.environ.get("REWARDHACK_CODE_BACKEND") or "subprocess").lower()
     if backend_name in {"local", "local_trusted", "trusted"}:
         return LocalTrustedBackend()
     if backend_name == "subprocess":
-        return SubprocessBackend()
+        return SubprocessBackend(
+            stdout_limit_chars=stdout_limit_chars,
+            stderr_limit_chars=stderr_limit_chars,
+            max_output_object_size=max_output_object_size,
+        )
     if backend_name == "docker":
-        return DockerBackend()
+        return DockerBackend(
+            stdout_limit_chars=stdout_limit_chars,
+            stderr_limit_chars=stderr_limit_chars,
+            max_output_object_size=max_output_object_size,
+        )
     if backend_name in {"prime", "prime_sandbox"}:
-        return PrimeSandboxBackend()
+        return PrimeSandboxBackend(
+            image=prime_sandbox_image,
+            timeout_minutes=prime_sandbox_timeout_minutes,
+            cpu_cores=prime_sandbox_cpu_cores,
+            stdout_limit_chars=stdout_limit_chars,
+            stderr_limit_chars=stderr_limit_chars,
+            max_output_object_size=max_output_object_size,
+        )
     raise ValueError(f"Unknown execution backend {backend_name!r}.")
+
+
+def execution_settings_from_config(config: Any) -> dict[str, Any]:
+    timeout_s = getattr(config, "effective_code_execution_timeout_seconds", None)
+    if timeout_s is None:
+        timeout_s = getattr(config, "code_execution_timeout_seconds", None)
+    if timeout_s is None:
+        timeout_s = getattr(config, "max_runtime_seconds", DEFAULT_TIMEOUT_SECONDS)
+
+    backend = get_execution_backend(
+        getattr(config, "code_execution_backend", None),
+        stdout_limit_chars=int(getattr(config, "code_execution_stdout_limit_chars", DEFAULT_STDOUT_LIMIT_CHARS)),
+        stderr_limit_chars=int(getattr(config, "code_execution_stderr_limit_chars", DEFAULT_STDERR_LIMIT_CHARS)),
+        max_output_object_size=int(getattr(config, "code_execution_max_output_object_size", DEFAULT_MAX_OUTPUT_OBJECT_SIZE)),
+        prime_sandbox_image=str(getattr(config, "prime_sandbox_image", DEFAULT_PRIME_SANDBOX_IMAGE)),
+        prime_sandbox_timeout_minutes=int(getattr(config, "prime_sandbox_timeout_minutes", DEFAULT_PRIME_SANDBOX_TIMEOUT_MINUTES)),
+        prime_sandbox_cpu_cores=int(getattr(config, "prime_sandbox_cpu_cores", DEFAULT_PRIME_SANDBOX_CPU_CORES)),
+    )
+    return {
+        "timeout_s": float(timeout_s),
+        "memory_mb": int(getattr(config, "code_execution_memory_mb", DEFAULT_MEMORY_LIMIT_MB)),
+        "backend": backend,
+    }
 
 
 async def run_function_cases(

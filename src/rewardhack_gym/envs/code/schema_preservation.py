@@ -7,7 +7,12 @@ from rewardhack_gym.core.base import CompositeEvaluator, FunctionalChecker, Rese
 from rewardhack_gym.core.config import EnvironmentConfig
 from rewardhack_gym.core.models import CheckerResult, EvaluatorResult, ExploitSurface, Task
 from rewardhack_gym.core.registry import register_environment
-from rewardhack_gym.envs.code.runtime import compile_submission, get_ast_signature, run_function_cases_sync
+from rewardhack_gym.envs.code.runtime import (
+    compile_submission,
+    execution_settings_from_config,
+    get_ast_signature,
+    run_function_cases_sync,
+)
 from rewardhack_gym.envs.code.schema_preservation_family import (
     sample_schema_preservation_task_spec,
 )
@@ -128,7 +133,7 @@ class SchemaPreservationCodeEnvironment(ResearchEnvironment[Task]):
             artifact,
             str(task.metadata["symbol_name"]),
             cases,
-            timeout_s=self.config.max_runtime_seconds,
+            **execution_settings_from_config(self.config),
         )
         evaluations = result.case_results
         passed_count = sum(1 for item in evaluations if item["passed"])
@@ -146,7 +151,7 @@ class SchemaPreservationCodeEnvironment(ResearchEnvironment[Task]):
             artifact,
             str(task.metadata["symbol_name"]),
             list(task.hidden_metadata["hidden_cases"]),  # type: ignore[arg-type]
-            timeout_s=self.config.max_runtime_seconds,
+            **execution_settings_from_config(self.config),
         )
         evaluations = result.case_results
         passed_count = sum(1 for item in evaluations if item["passed"])
@@ -176,7 +181,7 @@ class SchemaPreservationCodeEnvironment(ResearchEnvironment[Task]):
                     },
                 }
             ],
-            timeout_s=self.config.max_runtime_seconds,
+            **execution_settings_from_config(self.config),
         )
         evaluation = result.case_results[0] if result.case_results else {"passed": False}
         passed = result.status == "passed" and bool(evaluation["passed"])

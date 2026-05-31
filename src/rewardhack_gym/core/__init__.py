@@ -1,7 +1,7 @@
 """Core abstractions for RewardHack-Gym."""
 
 from rewardhack_gym.core.base import Checker, CompositeEvaluator, FunctionalChecker, ResearchEnvironment
-from rewardhack_gym.core.config import EnvironmentConfig, ExploitabilityProfile
+from rewardhack_gym.core.config import EnvironmentConfig, ExploitabilityProfile, SUPPORTED_CODE_EXECUTION_BACKENDS
 from rewardhack_gym.core.models import (
     CheckerResult,
     EvaluatorResult,
@@ -24,6 +24,7 @@ __all__ = [
     "FunctionalChecker",
     "ResearchEnvironment",
     "RuntimeMetadata",
+    "SUPPORTED_CODE_EXECUTION_BACKENDS",
     "Task",
     "Trajectory",
     "TrajectoryStep",

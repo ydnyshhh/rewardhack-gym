@@ -37,6 +37,9 @@ dependencies = [
 parquet = [
   "pyarrow>=16",
 ]
+prime-sandbox = [
+  "prime-sandboxes>=0.2.3",
+]
 
 [dependency-groups]
 dev = [

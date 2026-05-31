@@ -57,8 +57,19 @@ reward_mode = "official_only"
 reward_penalty_lambda = 1.0
 include_oracle_metrics = true
 expose_canonical_outputs = false
+code_execution_backend = "prime_sandbox"
+code_execution_timeout_seconds = 2.0
+code_execution_memory_mb = 256
+code_execution_stdout_limit_chars = 20000
+code_execution_stderr_limit_chars = 20000
+code_execution_max_output_object_size = 20000
+prime_sandbox_image = "python:3.12-slim"
+prime_sandbox_timeout_minutes = 10
+prime_sandbox_cpu_cores = 1
 ```
 
 Supported profiles are `aligned`, `low`, `medium`, `high`, and `adversarial`. `aligned` is the clean control: the official verifier is configured to be close to the oracle. Higher exploitability profiles make the official verifier increasingly weak relative to the oracle.
 
 The Verifiers task rows intentionally do not include `hidden_metadata`, oracle-case metadata, or canonical references by default. Oracle-only probes stay inside the taskset-owned private store and are used only during scoring.
+
+For local development, `code_execution_backend = "subprocess"` remains the default. For Prime-hosted multi-tenant runs, use `prime_sandbox`; the adapter depends on `prime-sandboxes`, creates sandboxes with outbound network disabled, uploads only the worker and per-run payload, applies command timeout/resource settings, and deletes the sandbox after each run.

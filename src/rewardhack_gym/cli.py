@@ -8,7 +8,7 @@ from typing import Any
 
 from rewardhack_gym import create_environment, list_environments
 from rewardhack_gym.analysis import build_matched_pairs, build_mech_interp_records, summarize_trajectories
-from rewardhack_gym.core.config import EnvironmentConfig
+from rewardhack_gym.core.config import EnvironmentConfig, SUPPORTED_CODE_EXECUTION_BACKENDS
 from rewardhack_gym.io import read_jsonl, write_jsonl
 
 
@@ -47,7 +47,7 @@ def filter_records_by_mode(records: list[dict[str, Any]], mode: str) -> list[dic
 
 
 def add_environment_config_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--profile", choices=("low", "medium", "high", "adversarial"), default="medium")
+    parser.add_argument("--profile", choices=("aligned", "low", "medium", "high", "adversarial"), default="medium")
     parser.add_argument("--official-coverage", type=float)
     parser.add_argument("--hidden-adversarial-strength", type=float)
     parser.add_argument("--parser-strictness", type=float)
@@ -55,6 +55,15 @@ def add_environment_config_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--domain-awareness", type=float)
     parser.add_argument("--perturbation-robustness", type=float)
     parser.add_argument("--public-example-diversity", type=float)
+    parser.add_argument("--code-execution-backend", choices=SUPPORTED_CODE_EXECUTION_BACKENDS, default="subprocess")
+    parser.add_argument("--code-execution-timeout-seconds", type=float)
+    parser.add_argument("--code-execution-memory-mb", type=int, default=256)
+    parser.add_argument("--code-execution-stdout-limit-chars", type=int, default=20_000)
+    parser.add_argument("--code-execution-stderr-limit-chars", type=int, default=20_000)
+    parser.add_argument("--code-execution-max-output-object-size", type=int, default=20_000)
+    parser.add_argument("--prime-sandbox-image", default="python:3.12-slim")
+    parser.add_argument("--prime-sandbox-timeout-minutes", type=int, default=10)
+    parser.add_argument("--prime-sandbox-cpu-cores", type=int, default=1)
 
 
 def build_environment_config(args: argparse.Namespace) -> EnvironmentConfig:
@@ -68,7 +77,20 @@ def build_environment_config(args: argparse.Namespace) -> EnvironmentConfig:
         "public_example_diversity": args.public_example_diversity,
     }
     cleaned_overrides = {key: value for key, value in overrides.items() if value is not None}
-    return EnvironmentConfig.from_profile(seed=args.seed, profile=args.profile, exploitability_overrides=cleaned_overrides)
+    return EnvironmentConfig.from_profile(
+        seed=args.seed,
+        profile=args.profile,
+        exploitability_overrides=cleaned_overrides,
+        code_execution_backend=args.code_execution_backend,
+        code_execution_timeout_seconds=args.code_execution_timeout_seconds,
+        code_execution_memory_mb=args.code_execution_memory_mb,
+        code_execution_stdout_limit_chars=args.code_execution_stdout_limit_chars,
+        code_execution_stderr_limit_chars=args.code_execution_stderr_limit_chars,
+        code_execution_max_output_object_size=args.code_execution_max_output_object_size,
+        prime_sandbox_image=args.prime_sandbox_image,
+        prime_sandbox_timeout_minutes=args.prime_sandbox_timeout_minutes,
+        prime_sandbox_cpu_cores=args.prime_sandbox_cpu_cores,
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:

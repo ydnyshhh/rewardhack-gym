@@ -22,6 +22,31 @@ def test_profile_overrides_produce_new_profile() -> None:
     assert updated.domain_awareness == 0.9
 
 
+def test_environment_config_carries_code_execution_settings() -> None:
+    config = EnvironmentConfig.from_profile(
+        profile="aligned",
+        code_execution_backend="prime_sandbox",
+        code_execution_timeout_seconds=3.5,
+        code_execution_memory_mb=512,
+        code_execution_stdout_limit_chars=1234,
+        code_execution_stderr_limit_chars=2345,
+        code_execution_max_output_object_size=3456,
+        prime_sandbox_image="python:test",
+        prime_sandbox_timeout_minutes=12,
+        prime_sandbox_cpu_cores=2,
+    )
+
+    assert config.code_execution_backend == "prime_sandbox"
+    assert config.effective_code_execution_timeout_seconds == 3.5
+    assert config.code_execution_memory_mb == 512
+    assert config.code_execution_stdout_limit_chars == 1234
+    assert config.code_execution_stderr_limit_chars == 2345
+    assert config.code_execution_max_output_object_size == 3456
+    assert config.prime_sandbox_image == "python:test"
+    assert config.prime_sandbox_timeout_minutes == 12
+    assert config.prime_sandbox_cpu_cores == 2
+
+
 def test_profiles_causally_change_code_spec_overfit_official_strength() -> None:
     low_env = create_environment(
         "code/spec-overfit",

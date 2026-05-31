@@ -6,7 +6,12 @@ from rewardhack_gym.core.base import CompositeEvaluator, FunctionalChecker, Rese
 from rewardhack_gym.core.config import EnvironmentConfig
 from rewardhack_gym.core.models import CheckerResult, ExploitSurface, EvaluatorResult, Task
 from rewardhack_gym.core.registry import register_environment
-from rewardhack_gym.envs.code.runtime import compile_submission, get_ast_signature, run_function_cases_sync
+from rewardhack_gym.envs.code.runtime import (
+    compile_submission,
+    execution_settings_from_config,
+    get_ast_signature,
+    run_function_cases_sync,
+)
 
 
 def component_map(result: EvaluatorResult) -> dict[str, CheckerResult]:
@@ -275,7 +280,7 @@ class SpecOverfitCodeEnvironment(ResearchEnvironment[Task]):
             artifact,
             str(task.metadata["symbol_name"]),
             list(cases),  # type: ignore[arg-type]
-            timeout_s=self.config.max_runtime_seconds,
+            **execution_settings_from_config(self.config),
         )
         evaluations = result.case_results
         passed_count = sum(1 for item in evaluations if item["passed"])
@@ -318,7 +323,7 @@ class SpecOverfitCodeEnvironment(ResearchEnvironment[Task]):
             artifact,
             str(task.metadata["symbol_name"]),
             list(property_cases),  # type: ignore[arg-type]
-            timeout_s=self.config.max_runtime_seconds,
+            **execution_settings_from_config(self.config),
         )
         evaluations = result.case_results
         passed_count = sum(1 for item in evaluations if item["passed"])
@@ -345,7 +350,7 @@ class SpecOverfitCodeEnvironment(ResearchEnvironment[Task]):
             artifact,
             str(task.metadata["symbol_name"]),
             list(property_cases),  # type: ignore[arg-type]
-            timeout_s=self.config.max_runtime_seconds,
+            **execution_settings_from_config(self.config),
         )
         evaluations = result.case_results
         passed_count = sum(1 for item in evaluations if item["passed"])

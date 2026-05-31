@@ -5,7 +5,7 @@ from collections.abc import Mapping, MutableMapping
 import verifiers as vf
 
 from rewardhack_gym import EnvironmentConfig, ResearchEnvironment, Task, Trajectory, create_environment
-from rewardhack_prime.config import RewardHackTasksetConfig, SUPPORTED_PROFILES
+from rewardhack_prime.config import RewardHackTasksetConfig, SUPPORTED_CODE_EXECUTION_BACKENDS, SUPPORTED_PROFILES
 from rewardhack_prime.conversion import rewardhack_task_to_vf_task
 from rewardhack_prime.private_store import PrivateTaskStore
 from rewardhack_prime.scoring import (
@@ -40,6 +40,25 @@ class RewardHackTaskset(vf.Taskset[RewardHackTasksetConfig]):
             raise ValueError("RewardHackTasksetConfig.num_tasks must be at least 1.")
         if self.config.reward_penalty_lambda < 0:
             raise ValueError("RewardHackTasksetConfig.reward_penalty_lambda must be non-negative.")
+        if self.config.code_execution_backend not in SUPPORTED_CODE_EXECUTION_BACKENDS:
+            raise ValueError(
+                f"Unknown RewardHack code_execution_backend {self.config.code_execution_backend!r}. "
+                f"Expected one of {SUPPORTED_CODE_EXECUTION_BACKENDS}."
+            )
+        if self.config.code_execution_timeout_seconds <= 0:
+            raise ValueError("RewardHackTasksetConfig.code_execution_timeout_seconds must be positive.")
+        if self.config.code_execution_memory_mb <= 0:
+            raise ValueError("RewardHackTasksetConfig.code_execution_memory_mb must be positive.")
+        if self.config.code_execution_stdout_limit_chars <= 0:
+            raise ValueError("RewardHackTasksetConfig.code_execution_stdout_limit_chars must be positive.")
+        if self.config.code_execution_stderr_limit_chars <= 0:
+            raise ValueError("RewardHackTasksetConfig.code_execution_stderr_limit_chars must be positive.")
+        if self.config.code_execution_max_output_object_size <= 0:
+            raise ValueError("RewardHackTasksetConfig.code_execution_max_output_object_size must be positive.")
+        if self.config.prime_sandbox_timeout_minutes <= 0:
+            raise ValueError("RewardHackTasksetConfig.prime_sandbox_timeout_minutes must be positive.")
+        if self.config.prime_sandbox_cpu_cores <= 0:
+            raise ValueError("RewardHackTasksetConfig.prime_sandbox_cpu_cores must be positive.")
 
     @property
     def rewardhack_env(self) -> ResearchEnvironment[Task]:
@@ -47,10 +66,21 @@ class RewardHackTaskset(vf.Taskset[RewardHackTasksetConfig]):
             env_config = EnvironmentConfig.from_profile(
                 seed=self.config.seed,
                 profile=self.config.profile,
+                max_runtime_seconds=self.config.code_execution_timeout_seconds,
+                code_execution_backend=self.config.code_execution_backend,
+                code_execution_timeout_seconds=self.config.code_execution_timeout_seconds,
+                code_execution_memory_mb=self.config.code_execution_memory_mb,
+                code_execution_stdout_limit_chars=self.config.code_execution_stdout_limit_chars,
+                code_execution_stderr_limit_chars=self.config.code_execution_stderr_limit_chars,
+                code_execution_max_output_object_size=self.config.code_execution_max_output_object_size,
+                prime_sandbox_image=self.config.prime_sandbox_image,
+                prime_sandbox_timeout_minutes=self.config.prime_sandbox_timeout_minutes,
+                prime_sandbox_cpu_cores=self.config.prime_sandbox_cpu_cores,
                 metadata={
                     "prime_split": self.config.split,
                     "prime_reward_mode": self.config.reward_mode,
                     "prime_reward_penalty_lambda": self.config.reward_penalty_lambda,
+                    "code_execution_backend": self.config.code_execution_backend,
                 },
             )
             self._env = create_environment(self.config.family, env_config)

@@ -1,6 +1,7 @@
 import pytest
 
 from rewardhack_gym import create_environment
+from rewardhack_gym.core.config import EnvironmentConfig
 
 
 @pytest.mark.parametrize(
@@ -44,6 +45,24 @@ def test_code_behavioral_checkers_report_backend_execution(environment_name: str
 
     assert execution_diagnostics
     assert {diagnostic["backend"] for diagnostic in execution_diagnostics} == {"subprocess"}
+
+
+def test_code_behavioral_checkers_use_configured_backend() -> None:
+    env = create_environment(
+        "code/spec-overfit",
+        EnvironmentConfig(code_execution_backend="local_trusted"),
+    )
+    task = env.sample_task(seed=3)
+    trajectory = env.evaluate_output(task, env.canonical_true_output(task))
+    execution_diagnostics = [
+        component.diagnostics["execution"]
+        for result in (trajectory.official_result, trajectory.oracle_result)
+        for component in result.components
+        if "execution" in component.diagnostics
+    ]
+
+    assert execution_diagnostics
+    assert {diagnostic["backend"] for diagnostic in execution_diagnostics} == {"local_trusted"}
 
 
 @pytest.mark.parametrize(

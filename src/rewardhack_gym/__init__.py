@@ -9,7 +9,7 @@ from rewardhack_gym.analysis.mech_interp import (
 from rewardhack_gym.analysis.metrics import MetricSummary, summarize_trajectories
 from rewardhack_gym.bootstrap import bootstrap_builtin_environments
 from rewardhack_gym.core.base import ResearchEnvironment
-from rewardhack_gym.core.config import EnvironmentConfig, ExploitabilityProfile
+from rewardhack_gym.core.config import EnvironmentConfig, ExploitabilityProfile, SUPPORTED_CODE_EXECUTION_BACKENDS
 from rewardhack_gym.core.models import (
     CheckerResult,
     EvaluatorResult,
@@ -31,6 +31,7 @@ __all__ = [
     "MechInterpRecord",
     "ResearchEnvironment",
     "RuntimeMetadata",
+    "SUPPORTED_CODE_EXECUTION_BACKENDS",
     "Task",
     "Trajectory",
     "TrajectoryStep",
