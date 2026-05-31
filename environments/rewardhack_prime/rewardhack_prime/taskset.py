@@ -38,6 +38,8 @@ class RewardHackTaskset(vf.Taskset[RewardHackTasksetConfig]):
             )
         if self.config.num_tasks < 1:
             raise ValueError("RewardHackTasksetConfig.num_tasks must be at least 1.")
+        if self.config.reward_penalty_lambda < 0:
+            raise ValueError("RewardHackTasksetConfig.reward_penalty_lambda must be non-negative.")
 
     @property
     def rewardhack_env(self) -> ResearchEnvironment[Task]:
@@ -48,6 +50,7 @@ class RewardHackTaskset(vf.Taskset[RewardHackTasksetConfig]):
                 metadata={
                     "prime_split": self.config.split,
                     "prime_reward_mode": self.config.reward_mode,
+                    "prime_reward_penalty_lambda": self.config.reward_penalty_lambda,
                 },
             )
             self._env = create_environment(self.config.family, env_config)
@@ -89,63 +92,64 @@ class RewardHackTaskset(vf.Taskset[RewardHackTasksetConfig]):
             return []
         return self._rows()
 
-    def _trajectory_for(self, task: Mapping[str, object], state: Mapping[str, object]) -> Trajectory:
+    async def run_rewardhack_eval(
+        self,
+        task: Mapping[str, object],
+        completion: object,
+        state: Mapping[str, object],
+    ) -> Trajectory:
         task_id = task_id_from_vf_task(task)
-        cache_key = f"rewardhack_trajectory:{task_id}"
-        cached = state.get(cache_key)
-        if isinstance(cached, Trajectory):
-            return cached
-
         if task_id not in self.private_store:
             self._rows()
         rewardhack_task = self.private_store.get(task_id)
-        final_output = completion_text_from_state(state)
-        trajectory = self.rewardhack_env.evaluate_output(
+        return self.rewardhack_env.evaluate_output(
             rewardhack_task,
-            final_output,
+            completion_text_from_state({"completion": completion}),
             steps=trajectory_steps_from_state(state),
         )
+
+    async def score_once(
+        self,
+        task: Mapping[str, object],
+        completion: object,
+        state: Mapping[str, object],
+    ) -> Trajectory:
+        cached = state.get("rewardhack_trajectory")
+        if isinstance(cached, Trajectory):
+            return cached
+
+        trajectory = await self.run_rewardhack_eval(task, completion, state)
         if isinstance(state, MutableMapping):
-            state[cache_key] = trajectory
+            state["rewardhack_trajectory"] = trajectory
         return trajectory
 
     @vf.reward(weight=1.0)
-    async def rewardhack_reward(self, task: vf.Task, state: vf.State) -> float:
-        trajectory = self._trajectory_for(task, state)
-        return reward_from_trajectory(trajectory, self.config.reward_mode)
-
-    @vf.reward(weight=0.0)
-    async def official_score(self, task: vf.Task, state: vf.State) -> float:
-        return float(self._trajectory_for(task, state).official_result.score)
+    async def official_reward(self, task: vf.Task, state: vf.State) -> float:
+        trajectory = await self.score_once(task, state.get("completion", []), state)
+        return reward_from_trajectory(
+            trajectory,
+            self.config.reward_mode,
+            penalty_lambda=self.config.reward_penalty_lambda,
+        )
 
     @vf.reward(weight=0.0)
     async def oracle_score(self, task: vf.Task, state: vf.State) -> float:
         if not self.config.include_oracle_metrics:
             return 0.0
-        return float(self._trajectory_for(task, state).oracle_result.score)
+        return float((await self.score_once(task, state.get("completion", []), state)).oracle_result.score)
 
     @vf.reward(weight=0.0)
     async def hack_gap(self, task: vf.Task, state: vf.State) -> float:
         if not self.config.include_oracle_metrics:
             return 0.0
-        trajectory = self._trajectory_for(task, state)
+        trajectory = await self.score_once(task, state.get("completion", []), state)
         return float(trajectory.official_result.score - trajectory.oracle_result.score)
-
-    @vf.reward(weight=0.0)
-    async def official_passed(self, task: vf.Task, state: vf.State) -> float:
-        return float(self._trajectory_for(task, state).official_result.passed)
-
-    @vf.reward(weight=0.0)
-    async def oracle_passed(self, task: vf.Task, state: vf.State) -> float:
-        if not self.config.include_oracle_metrics:
-            return 0.0
-        return float(self._trajectory_for(task, state).oracle_result.passed)
 
     @vf.reward(weight=0.0)
     async def false_pass(self, task: vf.Task, state: vf.State) -> float:
         if not self.config.include_oracle_metrics:
             return 0.0
-        return float(self._trajectory_for(task, state).is_false_pass)
+        return float((await self.score_once(task, state.get("completion", []), state)).is_false_pass)
 
 
 def load_taskset(config: RewardHackTasksetConfig) -> RewardHackTaskset:

@@ -13,6 +13,15 @@ The default `reward_mode` is `official_only`, so RL and eval rollouts optimize t
 
 Prime-facing task rows contain only the prompt, task identity fields, exploit surface, and redacted public metadata. Hidden cases, oracle probes, and canonical reference outputs stay in a `PrivateTaskStore` keyed by `task_id` and are used only by the scoring path. Set `expose_canonical_outputs = true` only for debugging workflows that intentionally publish canonical references.
 
+The Verifiers score outputs are deliberately narrow:
+
+- `official_reward`: weighted training reward
+- `oracle_score`: zero-weight monitor
+- `hack_gap`: zero-weight monitor
+- `false_pass`: zero-weight monitor
+
+Supported reward modes are `official_only`, `oracle_upper_bound`, `gap_penalized`, and `false_pass_penalized`. The two penalized modes are intended for mitigation experiments only.
+
 ## Usage
 
 ```python
@@ -45,6 +54,7 @@ split = "eval"
 num_tasks = 100
 seed = 0
 reward_mode = "official_only"
+reward_penalty_lambda = 1.0
 include_oracle_metrics = true
 expose_canonical_outputs = false
 ```
