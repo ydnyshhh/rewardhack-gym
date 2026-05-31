@@ -24,6 +24,10 @@ def environment_name(record: Trajectory | Mapping[str, Any]) -> str:
         return exported
     task_id = record_value(record, ("task", "task_id"), record_value(record, ("task_id",), ""))
     if isinstance(task_id, str) and ":" in task_id:
+        if task_id.startswith("rewardhack:"):
+            parts = task_id.split(":", 2)
+            if len(parts) >= 2 and parts[1]:
+                return parts[1]
         return task_id.split(":", 1)[0]
     return str(task_id or "unknown")
 

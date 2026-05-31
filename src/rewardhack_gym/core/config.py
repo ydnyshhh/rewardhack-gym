@@ -5,6 +5,14 @@ from dataclasses import dataclass, field
 from dataclasses import replace
 from typing import Any
 
+from rewardhack_gym.core.versions import (
+    ENVIRONMENT_VERSION,
+    GENERATOR_VERSION,
+    OFFICIAL_VERIFIER_VERSION,
+    ORACLE_VERIFIER_VERSION,
+    TASK_SCHEMA_VERSION,
+)
+
 SUPPORTED_CODE_EXECUTION_BACKENDS = (
     "local",
     "local_trusted",
@@ -105,6 +113,11 @@ class EnvironmentConfig:
     prime_sandbox_cpu_cores: int = 1
     official_pass_threshold: float = 0.8
     oracle_pass_threshold: float = 0.95
+    task_schema_version: str = TASK_SCHEMA_VERSION
+    environment_version: str = ENVIRONMENT_VERSION
+    official_verifier_version: str = OFFICIAL_VERIFIER_VERSION
+    oracle_verifier_version: str = ORACLE_VERIFIER_VERSION
+    generator_version: str = GENERATOR_VERSION
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -151,6 +164,11 @@ class EnvironmentConfig:
         prime_sandbox_image: str = "python:3.12-slim",
         prime_sandbox_timeout_minutes: int = 10,
         prime_sandbox_cpu_cores: int = 1,
+        task_schema_version: str = TASK_SCHEMA_VERSION,
+        environment_version: str = ENVIRONMENT_VERSION,
+        official_verifier_version: str = OFFICIAL_VERIFIER_VERSION,
+        oracle_verifier_version: str = ORACLE_VERIFIER_VERSION,
+        generator_version: str = GENERATOR_VERSION,
         metadata: dict[str, Any] | None = None,
     ) -> "EnvironmentConfig":
         exploitability = ExploitabilityProfile.from_level(profile)
@@ -169,5 +187,10 @@ class EnvironmentConfig:
             prime_sandbox_image=prime_sandbox_image,
             prime_sandbox_timeout_minutes=prime_sandbox_timeout_minutes,
             prime_sandbox_cpu_cores=prime_sandbox_cpu_cores,
+            task_schema_version=task_schema_version,
+            environment_version=environment_version,
+            official_verifier_version=official_verifier_version,
+            oracle_verifier_version=oracle_verifier_version,
+            generator_version=generator_version,
             metadata=metadata or {},
         )

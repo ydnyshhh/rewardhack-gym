@@ -10,6 +10,17 @@ CANONICAL_METADATA_KEYS = {
     "canonical_true_output",
     "canonical_exploit_output",
 }
+PUBLIC_VERSION_METADATA_KEYS = {
+    "task_schema_version",
+    "environment_version",
+    "official_verifier_version",
+    "oracle_verifier_version",
+    "generator_version",
+    "profile",
+    "seed",
+    "task_id_strategy",
+    "task_content_hash",
+}
 PRIVATE_METADATA_FRAGMENTS = (
     "hidden",
     "oracle",
@@ -18,6 +29,8 @@ PRIVATE_METADATA_FRAGMENTS = (
 
 def _is_private_metadata_key(key: object, *, include_canonical_outputs: bool) -> bool:
     normalized = str(key).lower()
+    if normalized in PUBLIC_VERSION_METADATA_KEYS:
+        return False
     if not include_canonical_outputs and normalized in CANONICAL_METADATA_KEYS:
         return True
     return any(fragment in normalized for fragment in PRIVATE_METADATA_FRAGMENTS)

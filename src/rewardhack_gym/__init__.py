@@ -20,6 +20,13 @@ from rewardhack_gym.core.models import (
     TrajectoryStep,
 )
 from rewardhack_gym.core.registry import create_environment, list_environments, register_environment
+from rewardhack_gym.core.versions import (
+    ENVIRONMENT_VERSION,
+    GENERATOR_VERSION,
+    OFFICIAL_VERIFIER_VERSION,
+    ORACLE_VERIFIER_VERSION,
+    TASK_SCHEMA_VERSION,
+)
 
 __all__ = [
     "CheckerResult",
@@ -29,10 +36,15 @@ __all__ = [
     "ExploitabilityProfile",
     "MetricSummary",
     "MechInterpRecord",
+    "ENVIRONMENT_VERSION",
+    "GENERATOR_VERSION",
+    "OFFICIAL_VERIFIER_VERSION",
+    "ORACLE_VERIFIER_VERSION",
     "ResearchEnvironment",
     "RuntimeMetadata",
     "SUPPORTED_CODE_EXECUTION_BACKENDS",
     "Task",
+    "TASK_SCHEMA_VERSION",
     "Trajectory",
     "TrajectoryStep",
     "build_matched_pairs",

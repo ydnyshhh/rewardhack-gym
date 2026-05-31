@@ -104,6 +104,13 @@ class RuntimeMetadata:
     rollout_version_id: str | None = None
     evaluator_version_id: str | None = None
     environment_profile: str | None = None
+    task_schema_version: str | None = None
+    environment_version: str | None = None
+    official_verifier_version: str | None = None
+    oracle_verifier_version: str | None = None
+    generator_version: str | None = None
+    task_content_hash: str | None = None
+    task_seed: int | None = None
     extra: Mapping[str, JSONValue] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, JSONValue]:

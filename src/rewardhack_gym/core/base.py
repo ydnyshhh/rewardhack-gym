@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from functools import wraps
 from time import perf_counter
 from typing import Callable, Generic, Iterable, Protocol, Sequence, TypeVar
 
@@ -13,6 +14,7 @@ from rewardhack_gym.core.models import (
     Task,
     Trajectory,
 )
+from rewardhack_gym.core.task_identity import with_stable_task_identity
 
 TaskT = TypeVar("TaskT", bound=Task)
 
@@ -77,6 +79,26 @@ class ResearchEnvironment(ABC, Generic[TaskT]):
 
     name: str
     family: str
+
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        super().__init_subclass__(**kwargs)
+        sample_task = cls.__dict__.get("sample_task")
+        if sample_task is None or getattr(sample_task, "_rewardhack_identity_wrapped", False):
+            return
+
+        @wraps(sample_task)
+        def wrapped_sample_task(self: "ResearchEnvironment[TaskT]", seed: int | None = None, *args: object, **kwargs: object) -> TaskT:
+            task = sample_task(self, seed=seed, *args, **kwargs)
+            effective_seed = self.config.seed if seed is None else seed
+            return with_stable_task_identity(
+                task,
+                environment_name=self.name,
+                config=self.config,
+                seed=effective_seed,
+            )  # type: ignore[return-value]
+
+        wrapped_sample_task._rewardhack_identity_wrapped = True  # type: ignore[attr-defined]
+        cls.sample_task = wrapped_sample_task  # type: ignore[method-assign]
 
     def __init__(self, config: EnvironmentConfig | None = None) -> None:
         self.config = config or EnvironmentConfig()
@@ -144,6 +166,13 @@ class ResearchEnvironment(ABC, Generic[TaskT]):
             rollout_version_id=rollout_version_id,
             evaluator_version_id=evaluator_version_id,
             environment_profile=self.config.exploitability.level,
+            task_schema_version=str(task.metadata.get("task_schema_version", self.config.task_schema_version)),
+            environment_version=str(task.metadata.get("environment_version", self.config.environment_version)),
+            official_verifier_version=str(task.metadata.get("official_verifier_version", self.config.official_verifier_version)),
+            oracle_verifier_version=str(task.metadata.get("oracle_verifier_version", self.config.oracle_verifier_version)),
+            generator_version=str(task.metadata.get("generator_version", self.config.generator_version)),
+            task_content_hash=str(task.metadata.get("task_content_hash", "")) or None,
+            task_seed=int(task.metadata["seed"]) if isinstance(task.metadata.get("seed"), int) else None,
         )
         from rewardhack_gym.core.models import TrajectoryStep
 
