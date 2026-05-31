@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping, Sequence
 import sys
 import types
 from pathlib import Path
@@ -9,6 +10,17 @@ from typing import Any
 import pytest
 
 from rewardhack_gym import create_environment
+
+
+def contains_key(value: object, key: str) -> bool:
+    if isinstance(value, Mapping):
+        return any(
+            item_key == key or contains_key(item_value, key)
+            for item_key, item_value in value.items()
+        )
+    if isinstance(value, Sequence) and not isinstance(value, (bytes, bytearray, str)):
+        return any(contains_key(item, key) for item in value)
+    return False
 
 
 class FakeTasksetConfig:
@@ -77,12 +89,62 @@ def test_rewardhack_task_conversion_hides_hidden_metadata(rewardhack_prime: type
     task = env.sample_task(seed=7)
 
     row = rewardhack_prime.rewardhack_task_to_vf_task(task)
+    public_metadata = row["info"]["metadata"]
 
     assert row["prompt"] == [{"role": "user", "content": task.prompt}]
     assert row["answer"] == ""
     assert row["info"]["task_id"] == task.task_id
     assert "hidden_metadata" not in row
     assert "hidden_metadata" not in row["info"]
+    assert "public_cases" in public_metadata
+    assert not contains_key(row, "hidden_cases")
+    assert not contains_key(row, "canonical_exploit_output")
+    assert not contains_key(row, "oracle_property_cases")
+
+
+def test_canonical_outputs_require_explicit_public_row_opt_in(
+    rewardhack_prime: types.ModuleType,
+) -> None:
+    env = create_environment("code/spec-overfit")
+    task = env.sample_task(seed=7)
+
+    redacted_row = rewardhack_prime.rewardhack_task_to_vf_task(task)
+    exposed_row = rewardhack_prime.rewardhack_task_to_vf_task(
+        task,
+        include_canonical_outputs=True,
+    )
+
+    assert not contains_key(redacted_row, "canonical_exploit_output")
+    assert exposed_row["info"]["metadata"]["canonical_exploit_output"] == task.metadata["canonical_exploit_output"]
+    assert not contains_key(exposed_row, "hidden_cases")
+    assert not contains_key(exposed_row, "oracle_property_cases")
+
+
+def test_private_store_keeps_oracle_state_out_of_public_rows(
+    rewardhack_prime: types.ModuleType,
+) -> None:
+    config = rewardhack_prime.RewardHackTasksetConfig(
+        family="code/spec-overfit",
+        profile="medium",
+        split="eval",
+        num_tasks=1,
+        seed=7,
+    )
+    taskset = rewardhack_prime.load_taskset(config)
+    row = taskset.load_eval_tasks()[0]
+    task_id = row["info"]["task_id"]
+    private_task = taskset.private_store.get(task_id)
+    prompt_text = row["prompt"][0]["content"]
+
+    assert not contains_key(row, "hidden_cases")
+    assert not contains_key(row, "oracle_property_cases")
+    assert not contains_key(row, "canonical_exploit_output")
+    assert private_task.hidden_metadata["hidden_cases"]
+    assert private_task.metadata["oracle_property_cases"]
+    assert private_task.metadata["canonical_exploit_output"]
+    assert "hidden_cases" not in prompt_text
+    for case in private_task.hidden_metadata["hidden_cases"]:
+        assert case["label"] not in prompt_text
 
 
 def test_rewardhack_taskset_scores_official_signal_and_oracle_metrics(
@@ -104,7 +166,7 @@ def test_rewardhack_taskset_scores_official_signal_and_oracle_metrics(
     assert all("hidden_metadata" not in row["info"] for row in rows)
 
     row = rows[0]
-    task = taskset._tasks_by_id[row["info"]["task_id"]]
+    task = taskset.private_store.get(row["info"]["task_id"])
     state = {
         "completion": [
             {
@@ -124,6 +186,19 @@ def test_rewardhack_taskset_scores_official_signal_and_oracle_metrics(
     assert official_score > oracle_score
     assert hack_gap == pytest.approx(official_score - oracle_score)
     assert false_pass == 1.0
+
+
+def test_trajectory_to_dict_hides_hidden_task_metadata_by_default() -> None:
+    env = create_environment("code/spec-overfit")
+    task = env.sample_task(seed=7)
+    trajectory = env.evaluate_output(task, env.canonical_exploit_output(task))
+
+    public_record = trajectory.to_dict()
+    private_record = trajectory.to_dict(include_hidden_task_metadata=True)
+
+    assert "hidden_metadata" not in public_record["task"]
+    assert "hidden_metadata" in private_record["task"]
+    assert "hidden_cases" in private_record["task"]["hidden_metadata"]
 
 
 def test_load_environment_returns_taskset_only_env(rewardhack_prime: types.ModuleType) -> None:

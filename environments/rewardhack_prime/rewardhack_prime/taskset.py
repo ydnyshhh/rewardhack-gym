@@ -7,6 +7,7 @@ import verifiers as vf
 from rewardhack_gym import EnvironmentConfig, ResearchEnvironment, Task, Trajectory, create_environment
 from rewardhack_prime.config import RewardHackTasksetConfig, SUPPORTED_PROFILES
 from rewardhack_prime.conversion import rewardhack_task_to_vf_task
+from rewardhack_prime.private_store import PrivateTaskStore
 from rewardhack_prime.scoring import (
     SUPPORTED_REWARD_MODES,
     completion_text_from_state,
@@ -20,8 +21,8 @@ class RewardHackTaskset(vf.Taskset[RewardHackTasksetConfig]):
     def __init__(self, config: RewardHackTasksetConfig) -> None:
         super().__init__(config=config)
         self._env: ResearchEnvironment[Task] | None = None
-        self._tasks_by_id: dict[str, Task] = {}
-        self._rows_cache: list[dict[str, object]] | None = None
+        self.private_store = PrivateTaskStore()
+        self._public_rows_cache: list[dict[str, object]] | None = None
         self._validate_config()
 
     def _validate_config(self) -> None:
@@ -56,23 +57,26 @@ class RewardHackTaskset(vf.Taskset[RewardHackTasksetConfig]):
         base_seed = self.config.seed + index
         for attempt in range(100):
             task = self.rewardhack_env.sample_task(seed=base_seed + attempt * 1_000_003)
-            if task.task_id not in self._tasks_by_id:
+            if task.task_id not in self.private_store:
                 return task
         raise RuntimeError(f"Could not sample a unique RewardHack task for index {index}.")
 
     def _rows(self) -> list[dict[str, object]]:
-        if self._rows_cache is not None:
-            return self._rows_cache
+        if self._public_rows_cache is not None:
+            return self._public_rows_cache
 
         rows: list[dict[str, object]] = []
         for index in range(self.config.num_tasks):
             task = self._sample_unique_task(index)
-            self._tasks_by_id[task.task_id] = task
-            row = rewardhack_task_to_vf_task(task)
+            self.private_store.add(task)
+            row = rewardhack_task_to_vf_task(
+                task,
+                include_canonical_outputs=self.config.expose_canonical_outputs,
+            )
             row["split"] = self.config.split
             row["max_turns"] = 1
             rows.append(row)
-        self._rows_cache = rows
+        self._public_rows_cache = rows
         return rows
 
     def load_tasks(self, split: vf.TaskSplit = "train") -> vf.Tasks:
@@ -92,9 +96,9 @@ class RewardHackTaskset(vf.Taskset[RewardHackTasksetConfig]):
         if isinstance(cached, Trajectory):
             return cached
 
-        if task_id not in self._tasks_by_id:
+        if task_id not in self.private_store:
             self._rows()
-        rewardhack_task = self._tasks_by_id[task_id]
+        rewardhack_task = self.private_store.get(task_id)
         final_output = completion_text_from_state(state)
         trajectory = self.rewardhack_env.evaluate_output(
             rewardhack_task,

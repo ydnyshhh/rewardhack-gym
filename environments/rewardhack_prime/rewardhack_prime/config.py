@@ -13,3 +13,4 @@ class RewardHackTasksetConfig(vf.TasksetConfig):
     seed: int = 0
     reward_mode: str = "official_only"
     include_oracle_metrics: bool = True
+    expose_canonical_outputs: bool = False

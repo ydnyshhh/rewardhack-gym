@@ -11,6 +11,8 @@ RewardHack-Gym tasks expose a deliberately imperfect verifier and a stronger ora
 
 The default `reward_mode` is `official_only`, so RL and eval rollouts optimize the imperfect official signal while oracle metrics remain available for analysis.
 
+Prime-facing task rows contain only the prompt, task identity fields, exploit surface, and redacted public metadata. Hidden cases, oracle probes, and canonical reference outputs stay in a `PrivateTaskStore` keyed by `task_id` and are used only by the scoring path. Set `expose_canonical_outputs = true` only for debugging workflows that intentionally publish canonical references.
+
 ## Usage
 
 ```python
@@ -44,8 +46,9 @@ num_tasks = 100
 seed = 0
 reward_mode = "official_only"
 include_oracle_metrics = true
+expose_canonical_outputs = false
 ```
 
 Supported profiles are `aligned`, `low`, `medium`, `high`, and `adversarial`. `aligned` is the clean control: the official verifier is configured to be close to the oracle. Higher exploitability profiles make the official verifier increasingly weak relative to the oracle.
 
-The Verifiers task rows intentionally do not include `hidden_metadata`. Oracle-only probes stay inside the taskset-owned `Task` objects and are used only during scoring.
+The Verifiers task rows intentionally do not include `hidden_metadata`, oracle-case metadata, or canonical references by default. Oracle-only probes stay inside the taskset-owned private store and are used only during scoring.
