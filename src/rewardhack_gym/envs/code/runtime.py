@@ -912,7 +912,7 @@ class PrimeSandboxBackend:
                     await client.upload_file(sandbox_id, "/tmp/rewardhack_payload.json", str(payload_path))
                     command_result = await client.execute_command(
                         sandbox_id,
-                        "python -I -B /tmp/rewardhack_worker.py < /tmp/rewardhack_payload.json",
+                        _prime_worker_command(),
                         timeout=_prime_command_timeout_seconds(timeout_s),
                     )
             except Exception as exc:
@@ -970,7 +970,7 @@ class PrimeSandboxBackend:
                 client.upload_file(sandbox_id, "/tmp/rewardhack_payload.json", str(payload_path))
                 command_result = client.execute_command(
                     sandbox_id,
-                    "python -I -B /tmp/rewardhack_worker.py < /tmp/rewardhack_payload.json",
+                    _prime_worker_command(),
                     timeout=_prime_command_timeout_seconds(timeout_s),
                 )
             except Exception as exc:
@@ -1041,6 +1041,14 @@ def _build_worker_payload(
 
 def _prime_command_timeout_seconds(timeout_s: float) -> int:
     return max(1, math.ceil(timeout_s))
+
+
+def _prime_worker_command() -> str:
+    return (
+        "sh -c 'payload=$(cat /tmp/rewardhack_payload.json) "
+        "&& rm -f /tmp/rewardhack_payload.json "
+        '&& printf "%s" "$payload" | python -I -B /tmp/rewardhack_worker.py\''
+    )
 
 
 class _worker_files:

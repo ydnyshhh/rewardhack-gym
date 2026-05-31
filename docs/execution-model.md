@@ -7,7 +7,7 @@ RewardHack-Gym exposes code execution through an explicit backend interface. The
 - `LocalTrustedBackend` executes submitted code in the current Python process and is trusted-local-only.
 - `SubprocessBackend` runs submitted function cases in a child process with timeouts, process-tree kill on timeout, stdout/stderr limits, output-object limits, blocked imports, blocked filesystem builtins, and an isolated temporary working directory.
 - `DockerBackend` runs the same worker inside a per-run container with `--network none`, memory limits, and CPU limits when Docker is available.
-- `PrimeSandboxBackend` uses the optional `prime-sandboxes` SDK to create a disposable Prime sandbox with `network_access=False`, upload the RewardHack worker and payload, run the worker with a per-command timeout, and delete the sandbox afterward.
+- `PrimeSandboxBackend` uses the optional `prime-sandboxes` SDK to create a disposable Prime sandbox with `network_access=False`, upload the RewardHack worker and payload, delete the payload file before the Python worker starts, run the worker with a per-command timeout, and delete the sandbox afterward.
 
 ## Current Behavior
 
@@ -46,6 +46,10 @@ Execution limits are first-class `EnvironmentConfig` fields:
 - `prime_sandbox_timeout_minutes`
 - `prime_sandbox_cpu_cores`
 
+`code_execution_timeout_seconds` controls the submitted-code command timeout. `prime_sandbox_timeout_minutes` controls the lifetime of the disposable Prime sandbox itself.
+
+The current worker executes submitted code in the same Python process as the harness after AST validation. The worker removes the predictable payload file before starting Python in Prime sandboxes, and blocks imports, filesystem builtins, subprocess escapes, eval/exec, and dunder attribute access. This is still a sandboxed research-eval model, not a proof-grade Python object-capability isolation boundary. A stronger future architecture would keep hidden cases in a harness process and run submitted code in a separate child process with only per-case inputs.
+
 ## Near-Term Guidance
 
 If you use RewardHack-Gym today:
@@ -55,6 +59,7 @@ If you use RewardHack-Gym today:
 - prefer `PrimeSandboxBackend` for Prime-hosted multi-tenant runs
 - do not expose `LocalTrustedBackend` as a public service
 - install `rewardhack-gym[prime-sandbox]` or `prime-sandboxes` directly before selecting `code_execution_backend="prime_sandbox"`
+- set `PRIME_API_KEY` for live Prime smoke tests; `PRIME_SANDBOX_API_KEY` is also accepted by the integration test and copied into `PRIME_API_KEY`
 
 ## Windows Test Note
 

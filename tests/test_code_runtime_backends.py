@@ -262,10 +262,106 @@ def test_prime_sandbox_backend_runs_through_prime_sdk(monkeypatch: pytest.Monkey
     assert request.kwargs["memory_gb"] == 2
     assert request.kwargs["cpu_cores"] == 2
     assert state["payload"]["memory_mb"] == 2048  # type: ignore[index]
-    assert state["command"] == "python -I -B /tmp/rewardhack_worker.py < /tmp/rewardhack_payload.json"
+    assert state["command"] == code_runtime._prime_worker_command()
+    assert "rm -f /tmp/rewardhack_payload.json" in state["command"]
+    assert state["command"].index("rm -f /tmp/rewardhack_payload.json") < state["command"].index("python -I -B")
     assert state["timeout"] == 1
     assert state["deleted"] == ["sbx_fake"]
     assert state["worker_files_closed"] is True
+
+
+def test_prime_sandbox_backend_deletes_sandbox_on_command_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    state: dict[str, object] = {"deleted": []}
+
+    class FakeWorkerFiles:
+        def __init__(self, payload: dict[str, object]) -> None:
+            del payload
+
+        def __enter__(self) -> tuple[str, str]:
+            return "worker.py", "payload.json"
+
+        def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+            pass
+
+    class FakeCreateSandboxRequest:
+        def __init__(self, **kwargs: object) -> None:
+            self.kwargs = kwargs
+
+    class FakeAPIClient:
+        pass
+
+    class FakeSandboxClient:
+        def __init__(self, api_client: FakeAPIClient) -> None:
+            del api_client
+
+        def create(self, request: FakeCreateSandboxRequest) -> types.SimpleNamespace:
+            del request
+            return types.SimpleNamespace(id="sbx_failure")
+
+        def wait_for_creation(self, sandbox_id: str) -> None:
+            del sandbox_id
+
+        def upload_file(self, sandbox_id: str, remote_path: str, local_path: str) -> None:
+            del sandbox_id, remote_path, local_path
+
+        def execute_command(self, sandbox_id: str, command: str, timeout: int) -> types.SimpleNamespace:
+            del sandbox_id, command, timeout
+            raise RuntimeError("boom")
+
+        def delete(self, sandbox_id: str) -> None:
+            deleted = state["deleted"]
+            assert isinstance(deleted, list)
+            deleted.append(sandbox_id)
+
+    fake_prime_sandboxes = types.ModuleType("prime_sandboxes")
+    fake_prime_sandboxes.APIClient = FakeAPIClient
+    fake_prime_sandboxes.CreateSandboxRequest = FakeCreateSandboxRequest
+    fake_prime_sandboxes.SandboxClient = FakeSandboxClient
+    monkeypatch.setitem(sys.modules, "prime_sandboxes", fake_prime_sandboxes)
+    monkeypatch.setattr(code_runtime, "_worker_files", FakeWorkerFiles)
+
+    result = PrimeSandboxBackend().run_function_cases_sync(
+        "def solve():\n"
+        "    return 'ok'\n",
+        "solve",
+        [{"label": "case", "args": [], "expected": "ok"}],
+        1.0,
+        128,
+    )
+
+    assert result.status == "sandbox_error"
+    assert state["deleted"] == ["sbx_failure"]
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    not (os.getenv("PRIME_API_KEY") or os.getenv("PRIME_SANDBOX_API_KEY")),
+    reason="requires Prime sandbox credentials",
+)
+def test_prime_sandbox_backend_live_smoke(monkeypatch: pytest.MonkeyPatch) -> None:
+    credential = os.getenv("PRIME_API_KEY") or os.getenv("PRIME_SANDBOX_API_KEY")
+    assert credential
+    monkeypatch.setenv("PRIME_API_KEY", credential)
+
+    result = PrimeSandboxBackend(
+        image="python:3.12-slim",
+        timeout_minutes=5,
+        cpu_cores=1,
+        stdout_limit_chars=1_000,
+        stderr_limit_chars=1_000,
+        max_output_object_size=1_000,
+    ).run_function_cases_sync(
+        "def add(a, b):\n"
+        "    return a + b\n",
+        "add",
+        [{"label": "small-add", "args": [2, 3], "expected": 5}],
+        10.0,
+        512,
+    )
+
+    assert result.backend == "prime_sandbox"
+    assert result.status == "passed"
+    assert result.case_results[0]["passed"] is True
 
 
 def test_public_backend_factories_and_missing_prime_sdk(monkeypatch: pytest.MonkeyPatch) -> None:

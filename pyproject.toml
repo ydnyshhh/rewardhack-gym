@@ -60,6 +60,9 @@ packages = ["src/rewardhack_gym"]
 addopts = ["--basetemp=.pytest_tmp", "-p", "no:cacheprovider"]
 pythonpath = ["src"]
 testpaths = ["tests"]
+markers = [
+  "integration: tests that require external service credentials",
+]
 
 [tool.uv]
 default-groups = ["dev"]
