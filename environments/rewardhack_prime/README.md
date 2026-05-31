@@ -22,6 +22,8 @@ The Verifiers score outputs are deliberately narrow:
 
 Supported reward modes are `official_only`, `oracle_upper_bound`, `gap_penalized`, and `false_pass_penalized`. The two penalized modes are intended for mitigation experiments only.
 
+The adapter uses native Verifiers v1 surfaces: `load_environment(...)` builds a `vf.Env`, `RewardHackTaskset` exposes train/eval examples via `rows()` and `eval_rows()`, and the four score outputs are `@vf.reward`-decorated taskset methods discoverable by Verifiers runtime scoring.
+
 ## Usage
 
 ```python

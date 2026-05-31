@@ -36,20 +36,35 @@ class FakeTasksetConfig:
 class FakeTaskset:
     def __init__(self, config: FakeTasksetConfig) -> None:
         self.config = config
+        self.rewards: list[object] = []
 
     def __class_getitem__(cls, item: object) -> type["FakeTaskset"]:
         del item
         return cls
 
+    def add_reward(self, reward: object) -> None:
+        self.rewards.append(reward)
+
+
+class FakeHarnessConfig:
+    pass
+
+
+class FakeHarness:
+    def __init__(self, config: FakeHarnessConfig) -> None:
+        self.config = config
+
 
 class FakeEnvConfig:
-    def __init__(self, taskset: FakeTasksetConfig) -> None:
+    def __init__(self, taskset: FakeTasksetConfig, harness: FakeHarnessConfig | None = None) -> None:
         self.taskset = taskset
+        self.harness = harness
 
 
 class FakeEnv:
-    def __init__(self, taskset: FakeTaskset) -> None:
+    def __init__(self, taskset: FakeTaskset, harness: FakeHarness | None = None) -> None:
         self.taskset = taskset
+        self.harness = harness
 
 
 @pytest.fixture()
@@ -57,6 +72,8 @@ def rewardhack_prime(monkeypatch: pytest.MonkeyPatch) -> types.ModuleType:
     fake_vf = types.ModuleType("verifiers")
     fake_vf.TasksetConfig = FakeTasksetConfig
     fake_vf.Taskset = FakeTaskset
+    fake_vf.HarnessConfig = FakeHarnessConfig
+    fake_vf.Harness = FakeHarness
     fake_vf.EnvConfig = FakeEnvConfig
     fake_vf.Env = FakeEnv
     fake_vf.TaskSplit = str
@@ -72,7 +89,8 @@ def rewardhack_prime(monkeypatch: pytest.MonkeyPatch) -> types.ModuleType:
         return decorate
 
     fake_vf.reward = reward
-    fake_vf.load_taskset = lambda config: None
+    fake_vf.load_taskset = lambda config: FakeTaskset(config=config)
+    fake_vf.load_harness = lambda config: FakeHarness(config=config)
     monkeypatch.setitem(sys.modules, "verifiers", fake_vf)
 
     package_path = Path(__file__).resolve().parents[1] / "environments" / "rewardhack_prime"
@@ -315,3 +333,30 @@ def test_load_environment_returns_taskset_only_env(rewardhack_prime: types.Modul
 
     assert isinstance(env, FakeEnv)
     assert env.taskset.config is config
+    assert env.harness is None
+
+
+def test_load_environment_delegates_to_verifiers_loaders(rewardhack_prime: types.ModuleType) -> None:
+    taskset_config = FakeTasksetConfig()
+    harness_config = FakeHarnessConfig()
+    env = rewardhack_prime.load_environment(FakeEnvConfig(taskset=taskset_config, harness=harness_config))
+
+    assert isinstance(env, FakeEnv)
+    assert isinstance(env.taskset, FakeTaskset)
+    assert env.taskset.config is taskset_config
+    assert isinstance(env.harness, FakeHarness)
+    assert env.harness.config is harness_config
+
+
+def test_rewardhack_taskset_exposes_native_verifiers_rows(rewardhack_prime: types.ModuleType) -> None:
+    eval_taskset = rewardhack_prime.load_taskset(
+        rewardhack_prime.RewardHackTasksetConfig(split="eval", num_tasks=2, seed=11)
+    )
+    train_taskset = rewardhack_prime.load_taskset(
+        rewardhack_prime.RewardHackTasksetConfig(split="train", num_tasks=2, seed=11)
+    )
+
+    assert eval_taskset.rows() == []
+    assert len(eval_taskset.eval_rows()) == 2
+    assert len(train_taskset.rows()) == 2
+    assert train_taskset.eval_rows() == []

@@ -17,7 +17,9 @@ from rewardhack_prime.scoring import (
 )
 
 
-class RewardHackTaskset(vf.Taskset[RewardHackTasksetConfig]):
+class RewardHackTaskset(vf.Taskset):
+    config_type = RewardHackTasksetConfig
+
     def __init__(self, config: RewardHackTasksetConfig) -> None:
         super().__init__(config=config)
         self._env: ResearchEnvironment[Task] | None = None
@@ -94,7 +96,7 @@ class RewardHackTaskset(vf.Taskset[RewardHackTasksetConfig]):
                 return task
         raise RuntimeError(f"Could not sample a unique RewardHack task for index {index}.")
 
-    def _rows(self) -> list[dict[str, object]]:
+    def _rewardhack_rows(self) -> list[dict[str, object]]:
         if self._public_rows_cache is not None:
             return self._public_rows_cache
 
@@ -115,12 +117,22 @@ class RewardHackTaskset(vf.Taskset[RewardHackTasksetConfig]):
     def load_tasks(self, split: vf.TaskSplit = "train") -> vf.Tasks:
         if str(split) != self.config.split:
             return []
-        return self._rows()
+        return self._rewardhack_rows()
 
     def load_eval_tasks(self) -> vf.Tasks:
         if self.config.split != "eval":
             return []
-        return self._rows()
+        return self._rewardhack_rows()
+
+    def rows(self) -> vf.Tasks:
+        if self.config.split == "eval":
+            return []
+        return self._rewardhack_rows()
+
+    def eval_rows(self) -> vf.Tasks:
+        if self.config.split != "eval":
+            return []
+        return self._rewardhack_rows()
 
     async def run_rewardhack_eval(
         self,
@@ -130,7 +142,7 @@ class RewardHackTaskset(vf.Taskset[RewardHackTasksetConfig]):
     ) -> Trajectory:
         task_id = task_id_from_vf_task(task)
         if task_id not in self.private_store:
-            self._rows()
+            self._rewardhack_rows()
         rewardhack_task = self.private_store.get(task_id)
         return self.rewardhack_env.evaluate_output(
             rewardhack_task,
