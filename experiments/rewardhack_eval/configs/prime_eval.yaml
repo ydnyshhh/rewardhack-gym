@@ -1,0 +1,23 @@
+experiment:
+  name: prime_eval_spec_overfit
+  type: prime_eval
+  seed: 0
+
+environment:
+  family: code/spec-overfit
+  profiles: [medium]
+  split: eval
+  num_tasks: 2
+  code_execution_backend: prime_sandbox
+  code_execution_timeout_seconds: 2.0
+  code_execution_memory_mb: 256
+
+models:
+  - id: dummy
+    provider: dummy
+
+sampling:
+  temperature: 0.2
+  top_p: 1.0
+  max_tokens: 1024
+

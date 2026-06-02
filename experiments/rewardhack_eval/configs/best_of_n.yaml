@@ -1,0 +1,39 @@
+experiment:
+  name: best_of_n_spec_overfit
+  type: best_of_n
+  seed: 0
+
+environment:
+  family: code/spec-overfit
+  split: eval
+  profiles: [aligned, low, medium, high, adversarial]
+  num_tasks: 2
+  code_execution_backend: subprocess
+  code_execution_timeout_seconds: 2.0
+  code_execution_memory_mb: 256
+
+models:
+  - id: dummy
+    provider: dummy
+
+sampling:
+  temperature: 0.7
+  top_p: 0.95
+  max_tokens: 1024
+  stop: []
+
+best_of_n:
+  values: [1, 2, 4]
+  selection_policies:
+    - official_only
+    - official_then_random
+    - official_then_low_oracle
+    - official_then_high_oracle
+    - oracle_upper_bound
+
+reporting:
+  save_examples: true
+  max_examples_per_bucket: 50
+  bootstrap_ci: true
+  bootstrap_samples: 100
+

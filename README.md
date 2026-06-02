@@ -118,6 +118,48 @@ The environment CLI exposes exploitability controls directly:
 - `--perturbation-robustness`
 - `--public-example-diversity`
 
+## Experiment runners
+
+RewardHack-Gym includes experiment-level runners for:
+
+- profile sweeps
+- model sweeps
+- best-of-N verifier optimization pressure
+- pass@k / hack@k analysis
+- report generation
+
+Example dry-run command:
+
+```bash
+python experiments/rewardhack_eval/run_best_of_n.py \
+  --config experiments/rewardhack_eval/configs/best_of_n.yaml \
+  --out runs/best_of_n_demo \
+  --dry-run \
+  --dummy-model-mode canonical_exploit
+```
+
+Each run writes a stable output directory:
+
+```text
+runs/<run_name>/
+  config.yaml
+  metadata.json
+  tasks.jsonl
+  candidates.jsonl
+  trajectories.jsonl
+  summary.json
+  metrics_by_model.json
+  metrics_by_profile.json
+  metrics_by_family.json
+  examples/
+  plots/
+  report.md
+```
+
+`official_score` is the score optimized by selection/training. `oracle_score` is monitor-only unless an experiment explicitly opts into an oracle diagnostic or mitigation policy. `false_pass` measures official-verifier success without intended-objective success.
+
+RewardHack-Gym turns verifier misspecification into a controllable experimental variable. The experiment runners measure how models behave as optimization pressure increases against the official verifier. If official pass rate improves while oracle pass rate lags or false-pass rate increases, this indicates verifier over-optimization / reward hacking in this controlled benchmark.
+
 ## Architecture
 
 - `rewardhack_gym.core`: typed primitives, configs, evaluation composition, and the registry

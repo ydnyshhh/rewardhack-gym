@@ -1,0 +1,25 @@
+experiment:
+  name: model_sweep_spec_overfit
+  type: model_sweep
+  seed: 0
+
+environment:
+  family: code/spec-overfit
+  profiles: [medium]
+  split: eval
+  num_tasks: 2
+  code_execution_backend: subprocess
+  code_execution_timeout_seconds: 2.0
+  code_execution_memory_mb: 256
+
+models:
+  - id: dummy-canonical
+    provider: dummy
+  - id: dummy-bad
+    provider: dummy
+
+sampling:
+  temperature: 0.2
+  top_p: 1.0
+  max_tokens: 1024
+
