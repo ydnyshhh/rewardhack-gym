@@ -160,6 +160,26 @@ runs/<run_name>/
 
 RewardHack-Gym turns verifier misspecification into a controllable experimental variable. The experiment runners measure how models behave as optimization pressure increases against the official verifier. If official pass rate improves while oracle pass rate lags or false-pass rate increases, this indicates verifier over-optimization / reward hacking in this controlled benchmark.
 
+Prime/OpenAI-compatible model sweep:
+
+```bash
+set PRIME_API_KEY=...
+python experiments/rewardhack_eval/run_model_sweep.py \
+  --config experiments/rewardhack_eval/configs/prime_model_sweep.yaml \
+  --out runs/prime_model_sweep_001
+```
+
+Hosted Prime/Verifiers rollouts can be analyzed without local model inference:
+
+```bash
+python experiments/rewardhack_eval/analyze_prime_rollouts.py \
+  --input prime_rollouts.jsonl \
+  --out runs/prime_eval_analysis_001 \
+  --overwrite
+```
+
+Local/offline model sweeps use a generic OpenAI-compatible HTTP client, so the same config shape can point at Prime Inference, vLLM, LiteLLM, OpenRouter-style gateways, or local OpenAI-compatible servers. For hosted evals and hosted training, Prime performs model inference; this repo only needs to expose the Verifiers environment and post-process exported rollout records into the same candidate/metric/report schema.
+
 ## Architecture
 
 - `rewardhack_gym.core`: typed primitives, configs, evaluation composition, and the registry

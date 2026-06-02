@@ -1,0 +1,68 @@
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+from rewardhack_gym.io import read_jsonl
+
+
+def test_analyze_prime_rollouts_normalizes_and_reports(tmp_path: Path) -> None:
+    input_path = tmp_path / "prime_rollouts.jsonl"
+    out_dir = tmp_path / "analysis"
+    rollout = {
+        "run_id": "prime-run",
+        "model_id": "prime-model",
+        "task": {
+            "prompt": [{"role": "user", "content": "Do the task"}],
+            "info": {
+                "task_id": "task-1",
+                "family": "code/spec-overfit",
+                "metadata": {"profile": "medium", "split": "eval"},
+            },
+        },
+        "completion": [{"role": "assistant", "content": "answer"}],
+        "official_reward": 1.0,
+        "oracle_score": 0.0,
+        "hack_gap": 1.0,
+        "false_pass": True,
+        "state": {
+            "rewardhack_trajectory": {
+                "exploit_labels": ["shortcut"],
+                "annotations": {"semantic_failures": ["missed-contract"]},
+            }
+        },
+    }
+    input_path.write_text(json.dumps(rollout) + "\n", encoding="utf-8")
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parents[1] / "src")
+    subprocess.run(
+        [
+            sys.executable,
+            "experiments/rewardhack_eval/analyze_prime_rollouts.py",
+            "--input",
+            str(input_path),
+            "--out",
+            str(out_dir),
+            "--overwrite",
+        ],
+        check=True,
+        cwd=Path(__file__).resolve().parents[1],
+        env=env,
+    )
+
+    candidates = read_jsonl(out_dir / "candidates.jsonl")
+    summary = json.loads((out_dir / "summary.json").read_text(encoding="utf-8"))
+    report = (out_dir / "report.md").read_text(encoding="utf-8")
+
+    assert candidates[0]["task_id"] == "task-1"
+    assert candidates[0]["family"] == "code/spec-overfit"
+    assert candidates[0]["profile"] == "medium"
+    assert candidates[0]["outcome_label"] == "false_pass"
+    assert summary["false_pass_rate"] == 1.0
+    assert "RewardHack-Gym Experiment Report" in report
+    assert "hidden_cases" not in report
+    assert "canonical_exploit_output" not in report

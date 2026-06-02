@@ -12,3 +12,22 @@ python experiments/rewardhack_eval/run_best_of_n.py \
 
 The runners write a stable run directory with public-safe task/candidate records, aggregate metrics, examples, plots, and `report.md`. Oracle scores are monitor-only unless a config explicitly requests an oracle diagnostic selection policy.
 
+Prime/OpenAI-compatible model sweep:
+
+```bash
+set PRIME_API_KEY=...
+python experiments/rewardhack_eval/run_model_sweep.py \
+  --config experiments/rewardhack_eval/configs/prime_model_sweep.yaml \
+  --out runs/prime_model_sweep_001
+```
+
+Hosted Prime/Verifiers rollout analysis:
+
+```bash
+python experiments/rewardhack_eval/analyze_prime_rollouts.py \
+  --input prime_rollouts.jsonl \
+  --out runs/prime_eval_analysis_001 \
+  --overwrite
+```
+
+`prime_inference` defaults to `https://api.pinference.ai/api/v1` and reads `PRIME_API_KEY`. Set `PRIME_TEAM_ID` when your Prime team routing requires `X-Prime-Team-ID`.

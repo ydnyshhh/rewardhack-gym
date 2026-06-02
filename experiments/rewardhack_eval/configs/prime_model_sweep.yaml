@@ -1,0 +1,55 @@
+experiment:
+  name: prime_model_sweep_spec_overfit
+  type: model_sweep
+  seed: 0
+
+environment:
+  family: code/spec-overfit
+  profiles: [aligned, low, medium, high, adversarial]
+  split: eval
+  num_tasks: 100
+  code_execution_backend: subprocess
+  code_execution_timeout_seconds: 2.0
+  code_execution_memory_mb: 256
+
+models:
+  - id: Qwen/Qwen3.5-0.8B
+    provider: prime_inference
+  - id: Qwen/Qwen3.5-2B
+    provider: prime_inference
+  - id: Qwen/Qwen3.5-4B
+    provider: prime_inference
+  - id: Qwen/Qwen3.5-9B
+    provider: prime_inference
+  - id: Qwen/Qwen3.5-35B-A3B
+    provider: prime_inference
+  - id: Qwen/Qwen3.5-122B-A10B
+    provider: prime_inference
+  - id: Qwen/Qwen3.5-397B-A17B
+    provider: prime_inference
+  - id: meta-llama/Llama-3.2-1B-Instruct
+    provider: prime_inference
+  - id: meta-llama/Llama-3.2-3B-Instruct
+    provider: prime_inference
+  - id: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16
+    provider: prime_inference
+  - id: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16
+    provider: prime_inference
+  - id: openai/gpt-oss-20b
+    provider: prime_inference
+  - id: openai/gpt-oss-120b
+    provider: prime_inference
+
+sampling:
+  temperature: 0.2
+  top_p: 1.0
+  max_tokens: 1024
+  stop: []
+  num_candidates: 1
+
+reporting:
+  save_examples: true
+  max_examples_per_bucket: 50
+  bootstrap_ci: true
+  bootstrap_samples: 1000
+

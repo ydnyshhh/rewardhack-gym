@@ -175,6 +175,12 @@ def candidate_from_trajectory(
 
 def normalize_rollout_record(record: dict[str, Any]) -> CandidateRecord:
     task = record.get("task") or record.get("state", {}).get("task") or {}
+    info = task.get("info", {}) if isinstance(task, Mapping) else {}
+    task_metadata = {}
+    if isinstance(task, Mapping) and isinstance(task.get("metadata"), Mapping):
+        task_metadata = dict(task["metadata"])
+    if isinstance(info, Mapping) and isinstance(info.get("metadata"), Mapping):
+        task_metadata.update(info["metadata"])
     state = record.get("state") or {}
     trajectory = state.get("rewardhack_trajectory") or record.get("rewardhack_trajectory") or {}
     official_score = float(record.get("official_reward", record.get("official_score", trajectory.get("official_result", {}).get("score", 0.0))))
@@ -188,10 +194,16 @@ def normalize_rollout_record(record: dict[str, Any]) -> CandidateRecord:
         completion_text = str(last.get("content", last)) if isinstance(last, Mapping) else str(last)
     else:
         completion_text = str(completion or "")
-    task_id = str(task.get("task_id", task.get("info", {}).get("task_id", record.get("task_id", "unknown"))))
-    family = str(task.get("family", task.get("info", {}).get("family", record.get("family", "unknown"))))
-    profile = str(record.get("profile", task.get("metadata", {}).get("profile", "unknown")))
-    split = str(record.get("split", task.get("metadata", {}).get("split", "eval")))
+    prompt_value = task.get("prompt", record.get("prompt", "")) if isinstance(task, Mapping) else record.get("prompt", "")
+    if isinstance(prompt_value, list) and prompt_value:
+        first_prompt = prompt_value[0]
+        prompt_text = str(first_prompt.get("content", first_prompt)) if isinstance(first_prompt, Mapping) else str(first_prompt)
+    else:
+        prompt_text = str(prompt_value or "")
+    task_id = str(task.get("task_id", info.get("task_id", record.get("task_id", "unknown"))))
+    family = str(task.get("family", info.get("family", record.get("family", "unknown"))))
+    profile = str(record.get("profile", task_metadata.get("profile", "unknown")))
+    split = str(record.get("split", task_metadata.get("split", "eval")))
     return CandidateRecord(
         run_id=str(record.get("run_id", "prime-rollout")),
         experiment_type=str(record.get("experiment_type", "prime_eval")),
@@ -203,7 +215,7 @@ def normalize_rollout_record(record: dict[str, Any]) -> CandidateRecord:
         candidate_id=str(record.get("candidate_id", task_id)),
         candidate_index=int(record.get("candidate_index", 0)),
         sampling=dict(record.get("sampling", {})),
-        prompt=str(task.get("prompt", record.get("prompt", ""))),
+        prompt=prompt_text,
         completion=completion_text,
         official_score=official_score,
         official_passed=official_passed,
@@ -218,4 +230,3 @@ def normalize_rollout_record(record: dict[str, Any]) -> CandidateRecord:
         duration_seconds=record.get("duration_seconds"),
         metadata=dict(record.get("metadata", {})),
     )
-

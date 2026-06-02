@@ -10,6 +10,7 @@ import yaml
 from rewardhack_gym import EnvironmentConfig, create_environment
 from rewardhack_gym.core.splits import split_seed
 from rewardhack_gym.experiments.metrics import compute_best_of_n_metrics, compute_candidate_metrics, grouped_metrics
+from rewardhack_gym.experiments.model_clients import build_model_client
 from rewardhack_gym.experiments.plotting import write_plots
 from rewardhack_gym.experiments.reporting import generate_report
 from rewardhack_gym.experiments.schemas import CandidateRecord, ExperimentConfig, ExperimentRunMetadata
@@ -58,6 +59,11 @@ def _evaluate_candidates(
     task_records: list[dict[str, Any]] = []
     candidates: list[CandidateRecord] = []
     trajectories: list[CandidateRecord] = []
+    model_clients = {
+        model.id: build_model_client(model)
+        for model in config.models
+        if not dry_run or model.provider in {"dummy", "static"}
+    }
     for family in config.environment.resolved_families():
         for profile in config.environment.resolved_profiles():
             env_config = EnvironmentConfig.from_profile(
@@ -78,13 +84,18 @@ def _evaluate_candidates(
             )
             task_records.extend(public_task_record(task) for task in tasks)
             for model in config.models:
+                client = model_clients.get(model.id)
                 for task_index, task in enumerate(tasks):
                     for candidate_index in range(num_candidates):
-                        if not dry_run and model.provider not in {"dummy", "static"}:
-                            raise RuntimeError(
-                                "Only --dry-run/dummy generation is implemented without optional model clients."
+                        if dry_run:
+                            completion = _dummy_completion(env, task, dummy_model_mode)
+                        else:
+                            if client is None:
+                                raise RuntimeError(f"No model client available for model {model.id!r}.")
+                            completion = client.generate(
+                                [{"role": "user", "content": task.prompt}],
+                                config.sampling,
                             )
-                        completion = _dummy_completion(env, task, dummy_model_mode)
                         trajectory = env.evaluate_output(
                             task,
                             completion,
@@ -311,4 +322,3 @@ def run_model_sweep_experiment(
         dummy_model_mode=dummy_model_mode,
         overwrite=overwrite,
     )
-
