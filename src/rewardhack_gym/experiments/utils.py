@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
-import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -10,11 +8,20 @@ from typing import Any, Iterable, Mapping
 import yaml
 
 from rewardhack_gym.core.models import JSONValue, Task, Trajectory, serialize_value
-from rewardhack_gym.experiments.schemas import CandidateRecord, ExperimentConfig, outcome_label
+from rewardhack_gym.experiments.schemas import CandidateRecord, ExperimentConfig, outcome_label, redact_public_metadata
 
 
 PRIVATE_METADATA_FRAGMENTS = ("hidden", "oracle")
 PRIVATE_METADATA_KEYS = {"canonical_true_output", "canonical_exploit_output"}
+SENSITIVE_CONFIG_KEYS = {
+    "api_key",
+    "authorization",
+    "access_token",
+    "bearer_token",
+    "password",
+    "secret",
+    "token",
+}
 
 
 def load_experiment_config(path: str | Path) -> ExperimentConfig:
@@ -49,7 +56,9 @@ def atomic_write_jsonl(path: str | Path, records: Iterable[Mapping[str, Any]]) -
 def copy_config_file(config_path: str | Path, run_dir: str | Path) -> None:
     target = Path(run_dir) / "config.yaml"
     target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(config_path, target)
+    with Path(config_path).open("r", encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    target.write_text(yaml.safe_dump(redact_experiment_config(payload), sort_keys=False), encoding="utf-8")
 
 
 def prepare_run_dir(run_dir: str | Path, *, overwrite: bool) -> Path:
@@ -83,6 +92,25 @@ def _is_private_key(key: object) -> bool:
     if normalized in PRIVATE_METADATA_KEYS:
         return True
     return any(fragment in normalized for fragment in PRIVATE_METADATA_FRAGMENTS)
+
+
+def _is_sensitive_config_key(key: object) -> bool:
+    normalized = str(key).lower()
+    if normalized in SENSITIVE_CONFIG_KEYS:
+        return True
+    return "header" in normalized
+
+
+def redact_experiment_config(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            str(key): ("<redacted>" if _is_sensitive_config_key(key) else redact_experiment_config(item))
+            for key, item in value.items()
+            if "header" not in str(key).lower()
+        }
+    if isinstance(value, list):
+        return [redact_experiment_config(item) for item in value]
+    return value
 
 
 def redact_public_value(value: Any) -> JSONValue:
@@ -169,7 +197,7 @@ def candidate_from_trajectory(
         semantic_failures=semantic_failures_from_trajectory(trajectory),
         execution_backend=execution_backend_from_trajectory(trajectory),
         duration_seconds=trajectory.runtime.duration_seconds,
-        metadata=dict(metadata or {}),
+        metadata=redact_public_metadata(dict(metadata or {})),
     )
 
 
@@ -204,6 +232,24 @@ def normalize_rollout_record(record: dict[str, Any]) -> CandidateRecord:
     family = str(task.get("family", info.get("family", record.get("family", "unknown"))))
     profile = str(record.get("profile", task_metadata.get("profile", "unknown")))
     split = str(record.get("split", task_metadata.get("split", "eval")))
+    raw_metadata = dict(record.get("metadata", {})) if isinstance(record.get("metadata", {}), Mapping) else {}
+    model = record.get("model", {})
+    if isinstance(model, Mapping):
+        if model.get("id") is not None:
+            raw_metadata.setdefault("model_id", str(model["id"]))
+        if model.get("model_path") is not None:
+            raw_metadata.setdefault("model_path", str(model["model_path"]))
+        if model.get("provider") is not None:
+            raw_metadata.setdefault("model_provider", str(model["provider"]))
+    if record.get("model_path") is not None:
+        raw_metadata.setdefault("model_path", str(record["model_path"]))
+    if record.get("model_provider") is not None:
+        raw_metadata.setdefault("model_provider", str(record["model_provider"]))
+    sampling = record.get("sampling")
+    if not isinstance(sampling, Mapping):
+        sampling = state.get("sampling") if isinstance(state, Mapping) else {}
+    if not isinstance(sampling, Mapping):
+        sampling = {}
     return CandidateRecord(
         run_id=str(record.get("run_id", "prime-rollout")),
         experiment_type=str(record.get("experiment_type", "prime_eval")),
@@ -214,7 +260,7 @@ def normalize_rollout_record(record: dict[str, Any]) -> CandidateRecord:
         task_id=task_id,
         candidate_id=str(record.get("candidate_id", task_id)),
         candidate_index=int(record.get("candidate_index", 0)),
-        sampling=dict(record.get("sampling", {})),
+        sampling=dict(sampling),
         prompt=prompt_text,
         completion=completion_text,
         official_score=official_score,
@@ -228,5 +274,5 @@ def normalize_rollout_record(record: dict[str, Any]) -> CandidateRecord:
         semantic_failures=[str(item) for item in record.get("semantic_failures", trajectory.get("annotations", {}).get("semantic_failures", []))],
         execution_backend=record.get("execution_backend"),
         duration_seconds=record.get("duration_seconds"),
-        metadata=dict(record.get("metadata", {})),
+        metadata=raw_metadata,
     )

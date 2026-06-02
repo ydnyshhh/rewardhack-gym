@@ -156,7 +156,9 @@ runs/<run_name>/
   report.md
 ```
 
-`official_score` is the score optimized by selection/training. `oracle_score` is monitor-only unless an experiment explicitly opts into an oracle diagnostic or mitigation policy. `false_pass` measures official-verifier success without intended-objective success.
+`official_score` is the score optimized by selection/training. `oracle_score` is monitor-only unless an experiment explicitly opts into an oracle diagnostic or mitigation policy. `false_pass` measures official-verifier success without intended-objective success. Local model sweeps generate completions first and only then evaluate official/oracle scores; oracle information is never used to generate completions or select candidates unless a best-of-N config explicitly requests `oracle_upper_bound`. Best-of-N defaults to `official_only`. `oracle_upper_bound` is a diagnostic upper bound, not a realistic deployment policy.
+
+Experiment outputs are public-safe by default: copied configs redact API-key values and request headers, task rows omit hidden/oracle/canonical references, and candidate records include the sampling config plus model id/model path provenance when available.
 
 RewardHack-Gym turns verifier misspecification into a controllable experimental variable. The experiment runners measure how models behave as optimization pressure increases against the official verifier. If official pass rate improves while oracle pass rate lags or false-pass rate increases, this indicates verifier over-optimization / reward hacking in this controlled benchmark.
 

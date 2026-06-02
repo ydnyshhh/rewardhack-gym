@@ -106,14 +106,20 @@ def _http_error_body(exc: urllib.error.HTTPError) -> str:
 def _required_metadata(model: ModelConfig, key: str) -> str:
     value = model.metadata.get(key)
     if not value:
-        raise ValueError(f"Model {model.id!r} is missing metadata.{key}.")
+        raise ValueError(
+            f"Model {model.id!r} with provider {model.provider!r} is missing metadata.{key}. "
+            f"Add models[].metadata.{key} in the experiment config."
+        )
     return str(value)
 
 
 def _required_env(model: ModelConfig, env_name: str, *, field_name: str) -> str:
     value = os.environ.get(env_name)
     if not value:
-        raise ValueError(f"Model {model.id!r} requires environment variable {env_name!r} from {field_name}.")
+        raise ValueError(
+            f"Model {model.id!r} with provider {model.provider!r} requires environment variable {env_name!r} "
+            f"from {field_name}. Set {env_name} or update models[].{field_name}."
+        )
     return value
 
 

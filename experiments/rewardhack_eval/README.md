@@ -10,7 +10,9 @@ python experiments/rewardhack_eval/run_best_of_n.py \
   --dummy-model-mode canonical_exploit
 ```
 
-The runners write a stable run directory with public-safe task/candidate records, aggregate metrics, examples, plots, and `report.md`. Oracle scores are monitor-only unless a config explicitly requests an oracle diagnostic selection policy.
+The runners write a stable run directory with public-safe task/candidate records, aggregate metrics, examples, plots, and `report.md`. Local sweeps generate completions before scoring; official and oracle scores are evaluation signals after generation. Best-of-N defaults to `official_only`. Oracle scores are monitor-only unless a config explicitly requests an oracle diagnostic selection policy such as `oracle_upper_bound`, which is an upper-bound diagnostic rather than a deployment policy.
+
+Output files redact API-key values and request headers, omit hidden/oracle/canonical task state, and store each candidate's sampling config plus model id/model path provenance when available.
 
 Prime/OpenAI-compatible model sweep:
 

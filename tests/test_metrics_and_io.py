@@ -204,3 +204,21 @@ def test_best_of_n_selection_modes_make_oracle_tie_breaks_explicit() -> None:
         selection_mode="oracle_upper_bound",
         selection_seed=0,
     ) == 2
+
+
+def test_best_of_n_runner_defaults_to_official_only_selection() -> None:
+    candidates = (
+        make_trajectory(official_score=1.0, official_passed=True, oracle_score=0.1, oracle_passed=False, profile="medium"),
+        make_trajectory(official_score=1.0, official_passed=True, oracle_score=0.9, oracle_passed=True, profile="medium"),
+    )
+
+    class FakeEnvironment:
+        def evaluate_output(self, task, output, *, policy_id=None, annotations=None):
+            del task, policy_id, annotations
+            return candidates[int(output)]
+
+    runner = BestOfNRunner(FakeEnvironment())
+    result = runner.run(candidates[0].task, lambda task, index: str(index), n=2)
+
+    assert result.selection_mode == "official_only"
+    assert result.selected_index == 0

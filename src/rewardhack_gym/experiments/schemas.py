@@ -14,6 +14,38 @@ SelectionPolicy = Literal[
     "oracle_upper_bound",
 ]
 DummyModelMode = Literal["canonical_true", "canonical_exploit", "random_bad"]
+PRIVATE_METADATA_FRAGMENTS = ("hidden", "oracle")
+PRIVATE_METADATA_KEYS = {"canonical_true_output", "canonical_exploit_output"}
+SENSITIVE_OUTPUT_KEYS = {
+    "api_key",
+    "authorization",
+    "access_token",
+    "bearer_token",
+    "password",
+    "secret",
+    "token",
+}
+
+
+def _is_private_or_sensitive_key(key: object) -> bool:
+    normalized = str(key).lower()
+    if normalized in PRIVATE_METADATA_KEYS or normalized in SENSITIVE_OUTPUT_KEYS:
+        return True
+    if "header" in normalized:
+        return True
+    return any(fragment in normalized for fragment in PRIVATE_METADATA_FRAGMENTS)
+
+
+def redact_public_metadata(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            str(key): redact_public_metadata(item)
+            for key, item in value.items()
+            if not _is_private_or_sensitive_key(key)
+        }
+    if isinstance(value, list):
+        return [redact_public_metadata(item) for item in value]
+    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,7 +169,7 @@ class ExperimentRunMetadata:
         return cls(
             run_id=run_id,
             experiment_type=config.experiment.type,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.fromtimestamp(config.experiment.seed, timezone.utc).isoformat(),
             git_commit=git_commit,
             config_path=config_path,
             families=config.environment.resolved_families(),
@@ -179,7 +211,9 @@ class CandidateRecord:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        data = asdict(self)
+        data["metadata"] = redact_public_metadata(data["metadata"])
+        return data
 
 
 @dataclass(frozen=True, slots=True)
@@ -261,4 +295,3 @@ def outcome_label(official_passed: bool, oracle_passed: bool) -> OutcomeLabel:
     if not official_passed and oracle_passed:
         return "false_fail"
     return "true_fail"
-

@@ -24,11 +24,16 @@ class BestOfNResult:
     selected: Trajectory
     candidates: tuple[Trajectory, ...]
     selected_index: int
-    selection_mode: SelectionMode = "official_then_low_oracle"
+    selection_mode: SelectionMode = "official_only"
 
 
 class BestOfNRunner(Generic[TaskT]):
-    """Sample multiple outputs, select under the official verifier, then inspect the oracle gap."""
+    """Sample outputs, select by the official verifier by default, then inspect oracle-only metrics.
+
+    Oracle-aware selection modes are explicit diagnostics. In particular,
+    ``oracle_upper_bound`` is an upper-bound analysis policy, not a realistic
+    deployment selection rule.
+    """
 
     def __init__(self, environment: ResearchEnvironment[TaskT]) -> None:
         self.environment = environment
@@ -40,7 +45,7 @@ class BestOfNRunner(Generic[TaskT]):
         *,
         n: int,
         policy_id: str | None = None,
-        selection_mode: SelectionMode = "official_then_low_oracle",
+        selection_mode: SelectionMode = "official_only",
         selection_seed: int = 0,
     ) -> BestOfNResult:
         if n <= 0:

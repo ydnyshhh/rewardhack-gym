@@ -23,6 +23,7 @@ from rewardhack_gym.experiments.utils import (
     load_experiment_config,
     prepare_run_dir,
     public_task_record,
+    redact_experiment_config,
 )
 
 
@@ -123,6 +124,8 @@ def _evaluate_candidates(
                             metadata={
                                 "task_index": task_index,
                                 "dummy_model_mode": dummy_model_mode if dry_run else None,
+                                "model_provider": model.provider,
+                                "model_path": model.model_path,
                             },
                         )
                         candidates.append(record)
@@ -225,7 +228,10 @@ def run_experiment(
     if config_path is not None:
         copy_config_file(config_path, run_dir)
     else:
-        (run_dir / "config.yaml").write_text(yaml.safe_dump(config.to_dict(), sort_keys=False), encoding="utf-8")
+        (run_dir / "config.yaml").write_text(
+            yaml.safe_dump(redact_experiment_config(config.to_dict()), sort_keys=False),
+            encoding="utf-8",
+        )
     run_id = _run_id(config.experiment.name, config.experiment.seed)
     metadata = ExperimentRunMetadata.create(
         run_id=run_id,
