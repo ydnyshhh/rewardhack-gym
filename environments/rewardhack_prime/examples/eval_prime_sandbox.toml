@@ -1,0 +1,23 @@
+[[env]]
+id = "rewardhack-prime"
+
+[env.taskset]
+family = "code/spec-overfit"
+profile = "medium"
+split = "eval"
+num_tasks = 100
+seed = 0
+reward_mode = "official_only"
+reward_penalty_lambda = 1.0
+include_oracle_metrics = true
+expose_canonical_outputs = false
+code_execution_backend = "prime_sandbox"
+code_execution_timeout_seconds = 2.0
+code_execution_memory_mb = 256
+code_execution_stdout_limit_chars = 20000
+code_execution_stderr_limit_chars = 20000
+code_execution_max_output_object_size = 20000
+prime_sandbox_image = "python:3.12-slim"
+prime_sandbox_timeout_minutes = 10
+prime_sandbox_cpu_cores = 1
+

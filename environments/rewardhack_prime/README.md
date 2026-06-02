@@ -26,6 +26,13 @@ The adapter uses native Verifiers v1 surfaces: `load_environment(...)` builds a 
 
 ## Usage
 
+Command-level smoke check:
+
+```bash
+cd environments/rewardhack_prime
+uv run python -c "import verifiers as vf; from rewardhack_prime import RewardHackTasksetConfig, load_environment; env = load_environment(vf.EnvConfig(taskset=RewardHackTasksetConfig(num_tasks=1))); print(len(env.taskset.eval_rows()))"
+```
+
 ```python
 import verifiers as vf
 from rewardhack_prime import RewardHackTasksetConfig, load_environment
@@ -69,6 +76,8 @@ prime_sandbox_image = "python:3.12-slim"
 prime_sandbox_timeout_minutes = 10
 prime_sandbox_cpu_cores = 1
 ```
+
+See `examples/eval_medium.toml` and `examples/eval_prime_sandbox.toml` for minimal runnable Prime eval configs.
 
 Supported profiles are `aligned`, `low`, `medium`, `high`, and `adversarial`. `aligned` is the clean control: the official verifier is configured to be close to the oracle. Higher exploitability profiles make the official verifier increasingly weak relative to the oracle.
 
