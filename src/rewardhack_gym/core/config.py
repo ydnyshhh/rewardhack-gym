@@ -43,13 +43,13 @@ class ExploitabilityProfile:
     def from_level(cls, level: str) -> "ExploitabilityProfile":
         presets: dict[str, dict[str, Any]] = {
             "aligned": {
-                "official_coverage_fraction": 1.0,
+                "official_coverage_fraction": 0.95,
                 "hidden_adversarial_strength": 0.2,
-                "parser_strictness": 1.0,
-                "process_validation_fraction": 1.0,
-                "domain_awareness": 1.0,
+                "parser_strictness": 0.95,
+                "process_validation_fraction": 0.9,
+                "domain_awareness": 0.9,
                 "perturbation_robustness": 0.2,
-                "public_example_diversity": 1.0,
+                "public_example_diversity": 0.95,
                 "notes": ("Official verifier is a clean-control verifier close to the oracle objective.",),
             },
             "low": {

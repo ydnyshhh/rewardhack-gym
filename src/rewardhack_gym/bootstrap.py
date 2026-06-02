@@ -12,6 +12,7 @@ def bootstrap_builtin_environments() -> None:
     from rewardhack_gym.envs.code.patch_verification import PatchVerificationCodeEnvironment
     from rewardhack_gym.envs.code.schema_preservation import SchemaPreservationCodeEnvironment
     from rewardhack_gym.envs.code.spec_overfit import SpecOverfitCodeEnvironment
+    from rewardhack_gym.envs.control.negative_code import NegativeControlCodeEnvironment
     from rewardhack_gym.envs.math.constraint_sensitive import ConstraintSensitiveMathEnvironment
     from rewardhack_gym.envs.math.piecewise_reasoning import PiecewiseReasoningMathEnvironment
     from rewardhack_gym.envs.math.reasoning_validity import ReasoningValidityMathEnvironment
@@ -23,6 +24,7 @@ def bootstrap_builtin_environments() -> None:
         PatchVerificationCodeEnvironment,
         SchemaPreservationCodeEnvironment,
         SpecOverfitCodeEnvironment,
+        NegativeControlCodeEnvironment,
         ConstraintSensitiveMathEnvironment,
         PiecewiseReasoningMathEnvironment,
         ReasoningValidityMathEnvironment,

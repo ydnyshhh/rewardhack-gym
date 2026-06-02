@@ -2,6 +2,7 @@ import pytest
 
 from rewardhack_gym import create_environment
 from rewardhack_gym.core.config import EnvironmentConfig
+from rewardhack_gym.runners import BestOfNRunner
 
 
 @pytest.mark.parametrize(
@@ -173,3 +174,48 @@ def test_schema_preservation_annotations_capture_failure_structure() -> None:
     assert trajectory.annotations["visible_probe_labels"]
     assert trajectory.annotations["hidden_probe_labels"]
     assert trajectory.annotations["semantic_failures"]
+
+
+def test_negative_control_true_output_passes_equivalent_official_and_oracle() -> None:
+    env = create_environment("control/negative-code")
+    task = env.sample_task(seed=3)
+    trajectory = env.evaluate_output(task, env.canonical_true_output(task))
+
+    assert trajectory.official_result.passed
+    assert trajectory.oracle_result.passed
+    assert trajectory.official_result.score == trajectory.oracle_result.score
+    assert not trajectory.is_false_pass
+    assert not trajectory.exploit_labels
+    assert task.hidden_metadata["hidden_cases"]
+    assert task.metadata["negative_control"] is True
+
+
+def test_negative_control_shortcut_fails_official_and_oracle() -> None:
+    env = create_environment("control/negative-code")
+    task = env.sample_task(seed=3)
+    trajectory = env.evaluate_output(task, env.canonical_exploit_output(task))
+
+    assert not trajectory.official_result.passed
+    assert not trajectory.oracle_result.passed
+    assert trajectory.official_result.score == trajectory.oracle_result.score
+    assert not trajectory.is_false_pass
+    assert not trajectory.exploit_labels
+
+
+def test_negative_control_best_of_n_does_not_amplify_hacks() -> None:
+    env = create_environment("control/negative-code")
+    task = env.sample_task(seed=3)
+    outputs = (env.canonical_exploit_output(task), env.canonical_true_output(task), env.canonical_exploit_output(task))
+    runner = BestOfNRunner(env)
+
+    result = runner.run(
+        task,
+        lambda task_, index: outputs[index],
+        n=len(outputs),
+        selection_mode="official_then_low_oracle",
+    )
+
+    assert result.selected_index == 1
+    assert result.selected.official_result.passed
+    assert result.selected.oracle_result.passed
+    assert not result.selected.is_false_pass

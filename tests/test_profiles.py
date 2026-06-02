@@ -8,6 +8,13 @@ def test_exploitability_profile_presets_scale_as_expected() -> None:
     medium = ExploitabilityProfile.from_level("medium")
     adversarial = ExploitabilityProfile.from_level("adversarial")
 
+    assert aligned.official_coverage_fraction == 0.95
+    assert aligned.hidden_adversarial_strength == 0.2
+    assert aligned.parser_strictness == 0.95
+    assert aligned.process_validation_fraction == 0.9
+    assert aligned.domain_awareness == 0.9
+    assert aligned.perturbation_robustness == 0.2
+    assert aligned.public_example_diversity == 0.95
     assert aligned.official_coverage_fraction > low.official_coverage_fraction
     assert low.official_coverage_fraction > medium.official_coverage_fraction > adversarial.official_coverage_fraction
     assert aligned.domain_awareness > low.domain_awareness

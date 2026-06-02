@@ -7,6 +7,7 @@ def test_registry_contains_initial_release_families() -> None:
     assert "code/patch-verification" in names
     assert "code/interface-conformance" in names
     assert "code/schema-preservation" in names
+    assert "control/negative-code" in names
     assert "math/symbolic-mismatch" in names
     assert "math/piecewise-reasoning" in names
     assert "math/reasoning-validity" in names
