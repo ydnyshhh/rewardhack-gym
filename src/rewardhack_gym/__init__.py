@@ -6,7 +6,7 @@ from rewardhack_gym.analysis.mech_interp import (
     build_mech_interp_record,
     build_mech_interp_records,
 )
-from rewardhack_gym.analysis.metrics import MetricSummary, summarize_trajectories
+from rewardhack_gym.analysis.metrics import BestOfNMetricSummary, MetricSummary, summarize_best_of_n, summarize_trajectories
 from rewardhack_gym.bootstrap import bootstrap_builtin_environments
 from rewardhack_gym.core.base import ResearchEnvironment
 from rewardhack_gym.core.config import EnvironmentConfig, ExploitabilityProfile, SUPPORTED_CODE_EXECUTION_BACKENDS
@@ -36,6 +36,7 @@ __all__ = [
     "ExploitSurface",
     "ExploitabilityProfile",
     "MetricSummary",
+    "BestOfNMetricSummary",
     "MechInterpRecord",
     "ENVIRONMENT_VERSION",
     "GENERATOR_VERSION",
@@ -56,5 +57,6 @@ __all__ = [
     "create_environment",
     "list_environments",
     "register_environment",
+    "summarize_best_of_n",
     "summarize_trajectories",
 ]
