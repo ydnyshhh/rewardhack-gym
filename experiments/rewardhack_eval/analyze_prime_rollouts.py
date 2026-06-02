@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 from pathlib import Path
 
 from rewardhack_gym.experiments.metrics import compute_candidate_metrics, grouped_metrics
@@ -21,24 +22,50 @@ def main() -> None:
     parser.add_argument("--input", required=True)
     parser.add_argument("--out", required=True)
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--experiment-name", default="prime_hosted_eval")
+    parser.add_argument("--bootstrap-ci", action="store_true")
+    parser.add_argument("--bootstrap-samples", type=int, default=1000)
     args = parser.parse_args()
 
     run_dir = prepare_run_dir(args.out, overwrite=args.overwrite)
     candidates = [normalize_rollout_record(record).to_dict() for record in read_jsonl(args.input)]
-    summary = compute_candidate_metrics(candidates, bootstrap=True)
-    metrics_by_model = grouped_metrics(candidates, lambda record: str(record["model_id"]))
-    metrics_by_profile = grouped_metrics(candidates, lambda record: str(record["profile"]))
-    metrics_by_family = grouped_metrics(candidates, lambda record: str(record["family"]))
+    summary = compute_candidate_metrics(
+        candidates,
+        bootstrap=args.bootstrap_ci,
+        bootstrap_samples=args.bootstrap_samples,
+    )
+    metrics_by_model = grouped_metrics(
+        candidates,
+        lambda record: str(record["model_id"]),
+        bootstrap=args.bootstrap_ci,
+        bootstrap_samples=args.bootstrap_samples,
+    )
+    metrics_by_profile = grouped_metrics(
+        candidates,
+        lambda record: str(record["profile"]),
+        bootstrap=args.bootstrap_ci,
+        bootstrap_samples=args.bootstrap_samples,
+    )
+    metrics_by_family = grouped_metrics(
+        candidates,
+        lambda record: str(record["family"]),
+        bootstrap=args.bootstrap_ci,
+        bootstrap_samples=args.bootstrap_samples,
+    )
+    splits = sorted({str(record["split"]) for record in candidates})
     metadata = {
         "run_id": Path(args.out).name,
-        "experiment_type": "prime_rollout_analysis",
+        "experiment_type": args.experiment_name,
+        "timestamp": datetime.fromtimestamp(0, timezone.utc).isoformat(),
         "git_commit": git_commit(),
+        "config_path": None,
         "input": args.input,
         "num_rollouts": len(candidates),
+        "num_tasks": len({str(record["task_id"]) for record in candidates}),
         "models": sorted({str(record["model_id"]) for record in candidates}),
         "families": sorted({str(record["family"]) for record in candidates}),
         "profiles": sorted({str(record["profile"]) for record in candidates}),
-        "split": sorted({str(record["split"]) for record in candidates}),
+        "split": splits[0] if len(splits) == 1 else splits,
     }
 
     atomic_write_json(run_dir / "metadata.json", metadata)
@@ -68,4 +95,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

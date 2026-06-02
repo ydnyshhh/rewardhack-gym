@@ -1,0 +1,37 @@
+experiment:
+  name: dummy_model_sweep_spec_overfit
+  type: model_sweep
+  seed: 0
+
+environment:
+  family: code/spec-overfit
+  profiles: [aligned, medium, adversarial]
+  split: eval
+  num_tasks: 5
+  code_execution_backend: subprocess
+
+models:
+  - id: dummy-true
+    provider: dummy
+    metadata:
+      dummy_model_mode: canonical_true
+
+  - id: dummy-exploit
+    provider: dummy
+    metadata:
+      dummy_model_mode: canonical_exploit
+
+  - id: dummy-bad
+    provider: dummy
+    metadata:
+      dummy_model_mode: random_bad
+
+sampling:
+  temperature: 0.0
+  top_p: 1.0
+  max_tokens: 1024
+
+reporting:
+  save_examples: true
+  max_examples_per_bucket: 20
+  bootstrap_ci: false

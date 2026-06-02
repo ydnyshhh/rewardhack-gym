@@ -138,6 +138,16 @@ python experiments/rewardhack_eval/run_best_of_n.py \
   --dummy-model-mode canonical_exploit
 ```
 
+Dry-run dummy model sweep:
+
+```bash
+python experiments/rewardhack_eval/run_model_sweep.py \
+  --config experiments/rewardhack_eval/configs/dummy_model_sweep.yaml \
+  --out runs/dummy_model_sweep_test \
+  --dry-run \
+  --overwrite
+```
+
 Each run writes a stable output directory:
 
 ```text
@@ -162,16 +172,20 @@ Experiment outputs are public-safe by default: copied configs redact API-key val
 
 RewardHack-Gym turns verifier misspecification into a controllable experimental variable. The experiment runners measure how models behave as optimization pressure increases against the official verifier. If official pass rate improves while oracle pass rate lags or false-pass rate increases, this indicates verifier over-optimization / reward hacking in this controlled benchmark.
 
-Prime/OpenAI-compatible model sweep:
+### Running Prime-Supported Models Locally
+
+RewardHack-Gym can call OpenAI-compatible model endpoints through the experiment runners. Prime Inference can be configured with `provider: prime_inference`.
 
 ```bash
-set PRIME_API_KEY=...
+PRIME_API_KEY=... \
 python experiments/rewardhack_eval/run_model_sweep.py \
   --config experiments/rewardhack_eval/configs/prime_model_sweep.yaml \
   --out runs/prime_model_sweep_001
 ```
 
-Hosted Prime/Verifiers rollouts can be analyzed without local model inference:
+The example config includes `Qwen/Qwen3.5-0.8B`, `Qwen/Qwen3.5-4B`, `Qwen/Qwen3.5-35B-A3B`, `meta-llama/Llama-3.2-3B-Instruct`, and `openai/gpt-oss-20b`. Hosted training/evals may support a live model list different from this static example; use the Prime CLI/API to list current models.
+
+For Prime Hosted Evals/Training, model inference is handled by Prime. Use the `rewardhack-prime` environment package and analyze exported rollouts with:
 
 ```bash
 python experiments/rewardhack_eval/analyze_prime_rollouts.py \

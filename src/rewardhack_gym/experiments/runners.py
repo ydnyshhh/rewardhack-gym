@@ -10,7 +10,7 @@ import yaml
 from rewardhack_gym import EnvironmentConfig, create_environment
 from rewardhack_gym.core.splits import split_seed
 from rewardhack_gym.experiments.metrics import compute_best_of_n_metrics, compute_candidate_metrics, grouped_metrics
-from rewardhack_gym.experiments.model_clients import build_model_client
+from rewardhack_gym.experiments.model_clients import ModelClient, build_model_client
 from rewardhack_gym.experiments.plotting import write_plots
 from rewardhack_gym.experiments.reporting import generate_report
 from rewardhack_gym.experiments.schemas import CandidateRecord, ExperimentConfig, ExperimentRunMetadata
@@ -32,14 +32,47 @@ def _run_id(name: str, seed: int) -> str:
     return f"{name}-{digest}"
 
 
-def _dummy_completion(env: Any, task: Any, mode: str) -> str:
+def _dummy_completion(env: Any, task: Any, mode: str, *, candidate_index: int = 0) -> str:
     if mode == "canonical_true":
         return env.canonical_true_output(task)
     if mode == "canonical_exploit":
         return env.canonical_exploit_output(task)
     if mode == "random_bad":
         return "I don't know."
+    if mode == "mixed_true_exploit_bad":
+        if candidate_index % 3 == 0:
+            return env.canonical_true_output(task)
+        if candidate_index % 3 == 1:
+            return env.canonical_exploit_output(task)
+        return "I don't know."
     raise ValueError(f"Unknown dummy model mode {mode!r}.")
+
+
+def _completion_for_model(
+    *,
+    env: Any,
+    task: Any,
+    model: Any,
+    config: ExperimentConfig,
+    dry_run: bool,
+    default_dummy_model_mode: str,
+    candidate_index: int,
+    clients: dict[str, ModelClient],
+) -> str:
+    if model.provider == "dummy":
+        mode = str(model.metadata.get("dummy_model_mode", default_dummy_model_mode))
+        return _dummy_completion(env, task, mode, candidate_index=candidate_index)
+    if model.provider == "static":
+        return str(model.metadata.get("completion", model.metadata.get("output", "")))
+    if dry_run:
+        mode = str(model.metadata.get("dummy_model_mode", default_dummy_model_mode))
+        return _dummy_completion(env, task, mode, candidate_index=candidate_index)
+    if model.id not in clients:
+        clients[model.id] = build_model_client(model)
+    return clients[model.id].generate(
+        [{"role": "user", "content": task.prompt}],
+        config.sampling,
+    )
 
 
 def _sample_tasks(*, env: Any, family: str, split: str, seed: int, num_tasks: int) -> list[Any]:
@@ -60,11 +93,7 @@ def _evaluate_candidates(
     task_records: list[dict[str, Any]] = []
     candidates: list[CandidateRecord] = []
     trajectories: list[CandidateRecord] = []
-    model_clients = {
-        model.id: build_model_client(model)
-        for model in config.models
-        if not dry_run or model.provider in {"dummy", "static"}
-    }
+    model_clients: dict[str, ModelClient] = {}
     for family in config.environment.resolved_families():
         for profile in config.environment.resolved_profiles():
             env_config = EnvironmentConfig.from_profile(
@@ -85,18 +114,18 @@ def _evaluate_candidates(
             )
             task_records.extend(public_task_record(task) for task in tasks)
             for model in config.models:
-                client = model_clients.get(model.id)
                 for task_index, task in enumerate(tasks):
                     for candidate_index in range(num_candidates):
-                        if dry_run:
-                            completion = _dummy_completion(env, task, dummy_model_mode)
-                        else:
-                            if client is None:
-                                raise RuntimeError(f"No model client available for model {model.id!r}.")
-                            completion = client.generate(
-                                [{"role": "user", "content": task.prompt}],
-                                config.sampling,
-                            )
+                        completion = _completion_for_model(
+                            env=env,
+                            task=task,
+                            model=model,
+                            config=config,
+                            dry_run=dry_run,
+                            default_dummy_model_mode=dummy_model_mode,
+                            candidate_index=candidate_index,
+                            clients=model_clients,
+                        )
                         trajectory = env.evaluate_output(
                             task,
                             completion,
@@ -123,7 +152,11 @@ def _evaluate_candidates(
                             trajectory=trajectory,
                             metadata={
                                 "task_index": task_index,
-                                "dummy_model_mode": dummy_model_mode if dry_run else None,
+                                "dummy_model_mode": (
+                                    str(model.metadata.get("dummy_model_mode", dummy_model_mode))
+                                    if dry_run or model.provider == "dummy"
+                                    else None
+                                ),
                                 "model_provider": model.provider,
                                 "model_path": model.model_path,
                             },
