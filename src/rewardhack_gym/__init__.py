@@ -20,6 +20,7 @@ from rewardhack_gym.core.models import (
     TrajectoryStep,
 )
 from rewardhack_gym.core.registry import create_environment, list_environments, register_environment
+from rewardhack_gym.core.splits import SUPPORTED_DATASET_SPLITS
 from rewardhack_gym.core.versions import (
     ENVIRONMENT_VERSION,
     GENERATOR_VERSION,
@@ -43,6 +44,7 @@ __all__ = [
     "ResearchEnvironment",
     "RuntimeMetadata",
     "SUPPORTED_CODE_EXECUTION_BACKENDS",
+    "SUPPORTED_DATASET_SPLITS",
     "Task",
     "TASK_SCHEMA_VERSION",
     "Trajectory",

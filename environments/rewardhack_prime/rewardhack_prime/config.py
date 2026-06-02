@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from typing import Literal
+
 import verifiers as vf
 
+SUPPORTED_SPLITS = ("train", "dev", "eval", "stress", "heldout")
 SUPPORTED_PROFILES = ("aligned", "low", "medium", "high", "adversarial")
 SUPPORTED_CODE_EXECUTION_BACKENDS = (
     "local",
@@ -17,7 +20,7 @@ SUPPORTED_CODE_EXECUTION_BACKENDS = (
 class RewardHackTasksetConfig(vf.TasksetConfig):
     family: str = "code/spec-overfit"
     profile: str = "medium"
-    split: str = "eval"
+    split: Literal["train", "dev", "eval", "stress", "heldout"] = "eval"
     num_tasks: int = 100
     seed: int = 0
     reward_mode: str = "official_only"

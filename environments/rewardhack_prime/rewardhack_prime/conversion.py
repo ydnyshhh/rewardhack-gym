@@ -17,6 +17,7 @@ PUBLIC_VERSION_METADATA_KEYS = {
     "oracle_verifier_version",
     "generator_version",
     "profile",
+    "split",
     "seed",
     "task_id_strategy",
     "task_content_hash",

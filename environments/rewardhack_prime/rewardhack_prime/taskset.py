@@ -5,7 +5,8 @@ from collections.abc import Mapping, MutableMapping
 import verifiers as vf
 
 from rewardhack_gym import EnvironmentConfig, ResearchEnvironment, Task, Trajectory, create_environment
-from rewardhack_prime.config import RewardHackTasksetConfig, SUPPORTED_CODE_EXECUTION_BACKENDS, SUPPORTED_PROFILES
+from rewardhack_gym.core.splits import split_seed
+from rewardhack_prime.config import RewardHackTasksetConfig, SUPPORTED_CODE_EXECUTION_BACKENDS, SUPPORTED_PROFILES, SUPPORTED_SPLITS
 from rewardhack_prime.conversion import rewardhack_task_to_vf_task
 from rewardhack_prime.private_store import PrivateTaskStore
 from rewardhack_prime.scoring import (
@@ -33,6 +34,13 @@ class RewardHackTaskset(vf.Taskset):
                 f"Unknown RewardHack profile {self.config.profile!r}. "
                 f"Expected one of {SUPPORTED_PROFILES}."
             )
+        if self.config.split not in SUPPORTED_SPLITS:
+            raise ValueError(
+                f"Unknown RewardHack split {self.config.split!r}. "
+                f"Expected one of {SUPPORTED_SPLITS}."
+            )
+        if self.config.split == "stress" and self.config.profile not in {"high", "adversarial"}:
+            raise ValueError("RewardHack stress split requires profile='high' or profile='adversarial'.")
         if self.config.reward_mode not in SUPPORTED_REWARD_MODES:
             raise ValueError(
                 f"Unknown RewardHack reward_mode {self.config.reward_mode!r}. "
@@ -67,6 +75,7 @@ class RewardHackTaskset(vf.Taskset):
         if self._env is None:
             env_config = EnvironmentConfig.from_profile(
                 seed=self.config.seed,
+                dataset_split=self.config.split,
                 profile=self.config.profile,
                 max_runtime_seconds=self.config.code_execution_timeout_seconds,
                 code_execution_backend=self.config.code_execution_backend,
@@ -80,6 +89,8 @@ class RewardHackTaskset(vf.Taskset):
                 prime_sandbox_cpu_cores=self.config.prime_sandbox_cpu_cores,
                 metadata={
                     "prime_split": self.config.split,
+                    "dataset_split": self.config.split,
+                    "task_identity_seed": self.config.seed,
                     "prime_reward_mode": self.config.reward_mode,
                     "prime_reward_penalty_lambda": self.config.reward_penalty_lambda,
                     "code_execution_backend": self.config.code_execution_backend,
@@ -89,9 +100,11 @@ class RewardHackTaskset(vf.Taskset):
         return self._env
 
     def _sample_unique_task(self, index: int) -> Task:
-        base_seed = self.config.seed + index
+        base_seed = split_seed(self.config.seed, split=self.config.split, index=index, salt=self.config.family)
         for attempt in range(100):
-            task = self.rewardhack_env.sample_task(seed=base_seed + attempt * 1_000_003)
+            task = self.rewardhack_env.sample_task(
+                seed=split_seed(base_seed, split=self.config.split, index=attempt, salt="retry")
+            )
             if task.task_id not in self.private_store:
                 return task
         raise RuntimeError(f"Could not sample a unique RewardHack task for index {index}.")
@@ -120,17 +133,17 @@ class RewardHackTaskset(vf.Taskset):
         return self._rewardhack_rows()
 
     def load_eval_tasks(self) -> vf.Tasks:
-        if self.config.split != "eval":
+        if self.config.split == "train":
             return []
         return self._rewardhack_rows()
 
     def rows(self) -> vf.Tasks:
-        if self.config.split == "eval":
+        if self.config.split != "train":
             return []
         return self._rewardhack_rows()
 
     def eval_rows(self) -> vf.Tasks:
-        if self.config.split != "eval":
+        if self.config.split == "train":
             return []
         return self._rewardhack_rows()
 

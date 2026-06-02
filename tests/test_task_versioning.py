@@ -12,7 +12,7 @@ def test_task_ids_are_stable_content_addressed_and_versioned() -> None:
 
     assert first.task_id == second.task_id
     assert first.task_id.startswith(
-        "rewardhack:code/spec-overfit:v0.1.0:profile=high:seed=7:template=feature-flags:sha="
+        "rewardhack:code/spec-overfit:v0.1.0:split=eval:profile=high:seed=7:template=feature-flags:sha="
     )
     assert len(str(first.metadata["task_content_hash"])) == 16
     assert first.metadata["task_schema_version"] == "0.2.0"
@@ -21,6 +21,7 @@ def test_task_ids_are_stable_content_addressed_and_versioned() -> None:
     assert first.metadata["oracle_verifier_version"] == "0.1.0"
     assert first.metadata["generator_version"] == "0.1.0"
     assert first.metadata["profile"] == "high"
+    assert first.metadata["split"] == "eval"
     assert first.metadata["seed"] == 7
 
 
@@ -44,4 +45,23 @@ def test_runtime_metadata_records_task_and_verifier_versions() -> None:
     assert runtime.generator_version == task.metadata["generator_version"]
     assert runtime.task_content_hash == task.metadata["task_content_hash"]
     assert runtime.task_seed == 7
+    assert runtime.dataset_split == "eval"
 
+
+def test_dataset_splits_produce_stable_distinct_tasks_and_hidden_cases() -> None:
+    train_env = create_environment(
+        "code/spec-overfit",
+        EnvironmentConfig.from_profile(profile="medium", seed=0, dataset_split="train"),
+    )
+    eval_env = create_environment(
+        "code/spec-overfit",
+        EnvironmentConfig.from_profile(profile="medium", seed=0, dataset_split="eval"),
+    )
+
+    train_task = train_env.sample_task(seed=7)
+    eval_task = eval_env.sample_task(seed=7)
+
+    assert train_task.task_id != eval_task.task_id
+    assert train_task.metadata["split"] == "train"
+    assert eval_task.metadata["split"] == "eval"
+    assert train_task.hidden_metadata["hidden_cases"] != eval_task.hidden_metadata["hidden_cases"]

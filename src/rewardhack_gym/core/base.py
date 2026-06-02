@@ -166,6 +166,7 @@ class ResearchEnvironment(ABC, Generic[TaskT]):
             rollout_version_id=rollout_version_id,
             evaluator_version_id=evaluator_version_id,
             environment_profile=self.config.exploitability.level,
+            dataset_split=str(task.metadata.get("split", self.config.dataset_split)),
             task_schema_version=str(task.metadata.get("task_schema_version", self.config.task_schema_version)),
             environment_version=str(task.metadata.get("environment_version", self.config.environment_version)),
             official_verifier_version=str(task.metadata.get("official_verifier_version", self.config.official_verifier_version)),

@@ -29,6 +29,7 @@ def task_version_metadata(
     seed: int,
     profile: str,
 ) -> dict[str, JSONValue]:
+    split = str(getattr(config, "dataset_split", "eval"))
     return {
         "task_schema_version": _metadata_value(config, "task_schema_version"),
         "environment_version": _metadata_value(config, "environment_version"),
@@ -36,6 +37,7 @@ def task_version_metadata(
         "oracle_verifier_version": _metadata_value(config, "oracle_verifier_version"),
         "generator_version": _metadata_value(config, "generator_version"),
         "profile": profile,
+        "split": split,
         "seed": seed,
         "task_id_strategy": TASK_ID_STRATEGY,
     }
@@ -87,13 +89,14 @@ def stable_task_id(
     environment_name: str,
     environment_version: str,
     profile: str,
+    split: str,
     seed: int,
     template: str,
     digest: str,
 ) -> str:
     return (
         f"rewardhack:{environment_name}:v{environment_version}:"
-        f"profile={profile}:seed={seed}:template={_slug(template)}:sha={digest}"
+        f"split={split}:profile={profile}:seed={seed}:template={_slug(template)}:sha={digest}"
     )
 
 
@@ -105,7 +108,11 @@ def with_stable_task_identity(
     seed: int,
 ) -> Task:
     profile = str(getattr(getattr(config, "exploitability"), "level"))
-    versions = task_version_metadata(config, seed=seed, profile=profile)
+    metadata_config = getattr(config, "metadata", {})
+    identity_seed = seed
+    if isinstance(metadata_config, dict) and "task_identity_seed" in metadata_config:
+        identity_seed = int(metadata_config["task_identity_seed"])
+    versions = task_version_metadata(config, seed=identity_seed, profile=profile)
     payload = normalized_task_payload(
         task,
         environment_name=environment_name,
@@ -119,9 +126,9 @@ def with_stable_task_identity(
         environment_name=environment_name,
         environment_version=str(versions["environment_version"]),
         profile=profile,
-        seed=seed,
+        split=str(versions["split"]),
+        seed=identity_seed,
         template=_template_id(task),
         digest=digest,
     )
     return replace(task, task_id=task_id, metadata=metadata)
-

@@ -12,6 +12,7 @@ from rewardhack_gym.core.versions import (
     ORACLE_VERIFIER_VERSION,
     TASK_SCHEMA_VERSION,
 )
+from rewardhack_gym.core.splits import SUPPORTED_DATASET_SPLITS
 
 SUPPORTED_CODE_EXECUTION_BACKENDS = (
     "local",
@@ -100,6 +101,7 @@ class EnvironmentConfig:
     """Shared environment-level configuration."""
 
     seed: int = 0
+    dataset_split: str = "eval"
     exploitability: ExploitabilityProfile = field(default_factory=ExploitabilityProfile)
     max_runtime_seconds: float = 2.0
     code_execution_backend: str = "subprocess"
@@ -121,6 +123,11 @@ class EnvironmentConfig:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        if self.dataset_split not in SUPPORTED_DATASET_SPLITS:
+            raise ValueError(
+                f"Unknown EnvironmentConfig.dataset_split {self.dataset_split!r}. "
+                f"Expected one of {SUPPORTED_DATASET_SPLITS}."
+            )
         if self.max_runtime_seconds <= 0:
             raise ValueError("EnvironmentConfig.max_runtime_seconds must be positive.")
         if self.code_execution_backend not in SUPPORTED_CODE_EXECUTION_BACKENDS:
@@ -152,6 +159,7 @@ class EnvironmentConfig:
         cls,
         *,
         seed: int = 0,
+        dataset_split: str = "eval",
         profile: str = "medium",
         exploitability_overrides: dict[str, Any] | None = None,
         max_runtime_seconds: float = 2.0,
@@ -176,6 +184,7 @@ class EnvironmentConfig:
             exploitability = exploitability.with_overrides(**exploitability_overrides)
         return cls(
             seed=seed,
+            dataset_split=dataset_split,
             exploitability=exploitability,
             max_runtime_seconds=max_runtime_seconds,
             code_execution_backend=code_execution_backend,

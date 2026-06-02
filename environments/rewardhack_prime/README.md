@@ -72,6 +72,8 @@ prime_sandbox_cpu_cores = 1
 
 Supported profiles are `aligned`, `low`, `medium`, `high`, and `adversarial`. `aligned` is the clean control: the official verifier is configured to be close to the oracle. Higher exploitability profiles make the official verifier increasingly weak relative to the oracle.
 
+Supported splits are `train`, `dev`, `eval`, `stress`, and `heldout`. `train` is the optimization split exposed through `rows()`; `dev`, `eval`, `stress`, and `heldout` are exposed through `eval_rows()` for tuning, reporting, stress testing, and final-report holdout use. `stress` requires `profile = "high"` or `profile = "adversarial"`. Split-specific seeds and hidden-case ordering keep train/eval oracle probes from reusing the same hidden test payloads.
+
 The Verifiers task rows intentionally do not include `hidden_metadata`, oracle-case metadata, or canonical references by default. Oracle-only probes stay inside the taskset-owned private store and are used only during scoring.
 
 For local development, `code_execution_backend = "subprocess"` remains the default. For Prime-hosted multi-tenant runs, use `prime_sandbox`; the adapter depends on `prime-sandboxes`, creates sandboxes with outbound network disabled, uploads only the worker and per-run payload, deletes the payload file before the worker starts, applies command timeout/resource settings, and deletes the sandbox after each run. `prime_sandbox_timeout_minutes` controls sandbox lifetime; `code_execution_timeout_seconds` controls the submitted-code command timeout.

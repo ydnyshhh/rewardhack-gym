@@ -104,6 +104,7 @@ class RuntimeMetadata:
     rollout_version_id: str | None = None
     evaluator_version_id: str | None = None
     environment_profile: str | None = None
+    dataset_split: str | None = None
     task_schema_version: str | None = None
     environment_version: str | None = None
     official_verifier_version: str | None = None

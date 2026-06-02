@@ -360,3 +360,41 @@ def test_rewardhack_taskset_exposes_native_verifiers_rows(rewardhack_prime: type
     assert len(eval_taskset.eval_rows()) == 2
     assert len(train_taskset.rows()) == 2
     assert train_taskset.eval_rows() == []
+
+
+def test_rewardhack_taskset_supports_stable_non_train_splits_without_hidden_reuse(
+    rewardhack_prime: types.ModuleType,
+) -> None:
+    train_taskset = rewardhack_prime.load_taskset(
+        rewardhack_prime.RewardHackTasksetConfig(split="train", profile="medium", num_tasks=1, seed=7)
+    )
+    eval_taskset = rewardhack_prime.load_taskset(
+        rewardhack_prime.RewardHackTasksetConfig(split="eval", profile="medium", num_tasks=1, seed=7)
+    )
+    dev_taskset = rewardhack_prime.load_taskset(
+        rewardhack_prime.RewardHackTasksetConfig(split="dev", profile="medium", num_tasks=1, seed=7)
+    )
+    stress_taskset = rewardhack_prime.load_taskset(
+        rewardhack_prime.RewardHackTasksetConfig(split="stress", profile="high", num_tasks=1, seed=7)
+    )
+
+    train_row = train_taskset.rows()[0]
+    eval_row = eval_taskset.eval_rows()[0]
+    dev_row = dev_taskset.eval_rows()[0]
+    stress_row = stress_taskset.eval_rows()[0]
+
+    assert train_row["split"] == "train"
+    assert eval_row["split"] == "eval"
+    assert dev_row["split"] == "dev"
+    assert stress_row["split"] == "stress"
+    assert train_row["info"]["metadata"]["seed"] == 7
+    assert train_row["info"]["metadata"]["split"] == "train"
+    assert eval_row["info"]["metadata"]["seed"] == 7
+    assert eval_row["info"]["metadata"]["split"] == "eval"
+    assert dev_taskset.rows() == []
+    assert stress_taskset.rows() == []
+
+    train_task = train_taskset.private_store.get(train_row["info"]["task_id"])
+    eval_task = eval_taskset.private_store.get(eval_row["info"]["task_id"])
+    assert train_task.task_id != eval_task.task_id
+    assert train_task.hidden_metadata["hidden_cases"] != eval_task.hidden_metadata["hidden_cases"]
