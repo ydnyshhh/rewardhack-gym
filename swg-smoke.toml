@@ -1,0 +1,7 @@
+model = "Qwen/Qwen3.5-0.8B"
+num_examples = 5
+rollouts_per_example = 1
+
+[[eval]]
+id = "yadnyesh/synthetic-workspace-gym"
+env_args = { split = "validation", family = "script_repair", max_examples = 5, max_turns = 8 }
